@@ -1,0 +1,1862 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fuji Film Recipe Studio</title>
+<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@4.3.3/build/mp4-muxer.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #f5f0ea; color: #2a2118; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; min-height: 100vh; padding: 20px 16px 60px; }
+  h1 { font-size: 12px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: #a8967c; margin-bottom: 24px; }
+  h1 span { color: #2a2118; }
+  .card { background: #fdfaf6; border: 1px solid #e8e0d4; border-radius: 12px; padding: 18px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(60,40,10,0.06); }
+  .card-title { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #b0987a; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .step-num { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #e8f4ee; color: #2e8c5a; font-size: 9px; font-weight: 700; flex-shrink: 0; }
+  .hint { font-size: 11px; color: #8a7560; line-height: 1.6; margin-bottom: 12px; }
+
+  .drop-zone { border: 1.5px dashed #d4c8b8; border-radius: 8px; padding: 28px 16px; text-align: center; cursor: pointer; transition: border-color 0.2s; position: relative; background: #faf6f0; }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: #2e8c5a; }
+  .drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .drop-icon { font-size: 24px; margin-bottom: 6px; }
+  .drop-label { font-size: 12px; color: #b0987a; }
+  .drop-label strong { color: #5c4a32; }
+
+  select, input[type=range] { width: 100%; background: #faf6f0; border: 1px solid #d4c8b8; border-radius: 6px; color: #2a2118; font-size: 12px; padding: 8px 10px; outline: none; appearance: none; -webkit-appearance: none; }
+  input[type=text] { width: 100%; background: #faf6f0; border: 1px solid #d4c8b8; border-radius: 6px; color: #2a2118; font-size: 12px; padding: 8px 10px; outline: none; }
+  input[type=text]::placeholder { color: #b0987a; }
+  .opt-label { font-size: 10px; color: #a8967c; margin: 10px 0 5px; letter-spacing: 0.08em; text-transform: uppercase; display: block; }
+  .row-val { font-size: 11px; color: #2e8c5a; font-weight: 600; }
+
+  .btn { width: 100%; padding: 12px; border-radius: 8px; border: none; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: opacity 0.2s; margin-top: 8px; }
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .btn-green { background: #2e8c5a; color: #fff; padding: 14px; font-size: 13px; }
+  .btn-green:not(:disabled):hover { opacity: 0.85; }
+  .btn-outline { background: #faf6f0; border: 1px solid #d4c8b8; color: #6b5540; }
+  .btn-outline:not(:disabled):hover { border-color: #a8967c; color: #2a2118; }
+
+  .canvas-wrap { position: relative; margin-top: 12px; display: none; }
+  .canvas-wrap.show { display: block; }
+  canvas { width: 100%; border-radius: 8px; display: block; background: #e8e0d4; cursor: crosshair; }
+  .anchor-dot { position: absolute; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #2e8c5a; background: rgba(46,140,90,0.2); transform: translate(-50%,-50%); pointer-events: none; }
+  .note { font-size: 10px; color: #b0987a; margin-top: 8px; line-height: 1.5; }
+
+  .progress-wrap { display: none; margin-top: 12px; }
+  .progress-wrap.show { display: block; }
+  .progress-bg { background: #e8e0d4; border-radius: 3px; height: 3px; overflow: hidden; margin-bottom: 6px; }
+  .progress-fill { height: 100%; background: #2e8c5a; border-radius: 3px; transition: width 0.2s; width: 0%; }
+  .progress-lbl { font-size: 10px; color: #a8967c; }
+
+  .output-wrap { display: none; margin-top: 14px; }
+  .output-wrap.show { display: block; }
+  .preview-video { width: 100%; border-radius: 8px; max-height: 420px; object-fit: contain; background: #2a2118; display: block; }
+  .dl-link { display: block; text-align: center; margin-top: 10px; text-decoration: none; padding: 13px; border-radius: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; background: #2e8c5a; color: #fff; }
+</style>
+</head>
+<body>
+
+<h1>Fuji / <span>Film Recipe Studio</span></h1>
+
+<!-- STEP 1: UPLOAD -->
+<div class="card">
+  <div class="card-title"><span class="step-num">1</span> Upload photos</div>
+  <p class="hint">Add up to 8 photos. Drag to reorder. Each gets its own zoom and anchor point. Recipe applies to all.</p>
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept="image/*" multiple style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">
+    <div class="drop-icon">🖼</div>
+    <div class="drop-label"><strong>Tap to upload</strong> — single or multiple photos</div>
+  </div>
+  <div id="photoQueue" style="margin-top:10px;display:none"></div>
+</div>
+
+<!-- STEP 2: RECIPE -->
+<div class="card">
+  <div class="card-title"><span class="step-num">2</span> Choose recipe</div>
+
+  <button type="button" class="btn btn-outline" id="recipePickerBtn" style="text-align:left;display:flex;justify-content:space-between;align-items:center;text-transform:none;font-weight:400;letter-spacing:0">
+    <span id="recipePickerLabel">Kodachrome 64</span>
+    <span style="color:#444">▾</span>
+  </button>
+  <p class="hint" id="recipeDesc" style="margin-top:8px;margin-bottom:0">Punchy and saturated with deep blacks and warm reds — good for bold travel and street shots in strong light.</p>
+
+  <select id="recipe" style="display:none">
+    <option value="portra400">Kodak Portra 400</option>
+    <option value="gold200">Kodak Gold 200</option>
+    <option value="trix400">Kodak Tri-X 400 (B&W)</option>
+  </select>
+
+  <label class="opt-label">Recipe strength <span class="row-val" id="strengthVal">100%</span></label>
+  <input type="range" id="strength" min="0" max="100" value="100">
+
+  <label class="opt-label">Grain <span class="row-val" id="grainVal">35</span></label>
+  <input type="range" id="grain" min="0" max="100" value="35">
+
+  <button class="btn btn-green" id="applyBtn" disabled>Apply recipe</button>
+</div>
+
+<!-- RECIPE PICKER MODAL -->
+<div id="recipeModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:flex-end;justify-content:center;">
+  <div style="background:#fdfaf6;border-radius:16px 16px 0 0;width:100%;max-width:600px;overflow:hidden" id="recipeModalList"></div>
+</div>
+
+<!-- STEP 3: PREVIEW + ANCHOR -->
+<div class="card">
+  <div class="card-title"><span class="step-num">3</span> Preview & focal point</div>
+  <p class="hint" id="previewHint">Tap the face (or focal point) — the zoom will pull toward that point. Tap a photo in the queue above to set its focal point.</p>
+  <div class="canvas-wrap" id="canvasWrap">
+    <canvas id="canvas"></canvas>
+    <div class="anchor-dot" id="anchorDot" style="display:none"></div>
+  </div>
+</div>
+
+<!-- STEP 4: EXPORT -->
+<div class="card">
+  <div class="card-title"><span class="step-num">4</span> Export</div>
+  <button class="btn btn-outline" id="exportJpgBtn" disabled>Export still (JPG)</button>
+
+  <button class="btn btn-outline" id="surpriseBtn" style="border-color:#2e8c5a;color:#2e8c5a">🎲 Surprise me</button>
+
+  <label class="opt-label">Zoom duration per photo <span class="row-val" id="durVal">3s</span></label>
+  <input type="range" id="duration" min="2" max="5" value="3">
+  <p class="hint" id="totalDurHint" style="margin-top:4px;margin-bottom:0;color:#8a7560">Actual reel: <strong id="totalDurVal">—</strong></p>
+
+  <label class="opt-label">Zoom amount <span class="row-val" id="zoomVal">15%</span></label>
+  <input type="range" id="zoomAmt" min="5" max="40" value="15">
+
+  <label class="opt-label">Photo fit</label>
+  <select id="fitMode">
+    <option value="cover">Fill frame (crop to fit)</option>
+    <option value="contain">Full photo (black bars)</option>
+  </select>
+
+  <label class="opt-label">Frame border</label>
+  <select id="frameStyle">
+    <option value="none">None</option>
+    <option value="white">White film border</option>
+    <option value="black">Black cinema border</option>
+    <option value="rebate">Film rebate (edge markings)</option>
+    <option value="sprocket">35mm sprocket holes</option>
+    <option value="polaroid">Polaroid (thick bottom)</option>
+    <option value="instax">Instax mini</option>
+    <option value="vignette">Soft vignette only</option>
+  </select>
+
+  <label class="opt-label">Movement</label>
+  <select id="panDirection">
+    <option value="none">Zoom only (toward tapped point)</option>
+    <option value="lr">Zoom + pan left → right</option>
+    <option value="rl">Zoom + pan right → left</option>
+    <option value="tb">Zoom + pan top → bottom</option>
+    <option value="bt">Zoom + pan bottom → top</option>
+  </select>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
+    <span style="font-size:12px;color:#5c4a32;">Dust & scratches</span>
+    <input type="checkbox" id="dustToggle" checked>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
+    <span style="font-size:12px;color:#5c4a32;">Light leak</span>
+    <input type="checkbox" id="leakToggle" checked>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
+    <span style="font-size:12px;color:#5c4a32;">Film memory cover card (end of reel)</span>
+  </div>
+  <input type="text" id="coverLabel" placeholder="Type a cover label to add an end card — leave empty to skip it" style="margin-top:8px">
+
+  <div class="canvas-wrap show" id="scrubWrap" style="display:none">
+    <canvas id="scrubCanvas"></canvas>
+  </div>
+  <label class="opt-label" id="scrubLabel" style="display:none">Preview scrub <span class="row-val" id="scrubVal">0:00</span></label>
+  <input type="range" id="scrubBar" min="0" max="1000" value="0" style="display:none">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
+    <span style="font-size:12px;color:#5c4a32;">Watermark</span>
+    <input type="checkbox" id="wmToggle">
+  </div>
+  <input type="text" id="wmText" placeholder="@yourhandle or your website" style="margin-top:8px;display:none">
+
+  <label class="opt-label" style="margin-top:14px">Export format</label>
+  <div style="display:flex;gap:12px;margin-top:4px">
+    <label style="font-size:12px;color:#5c4a32;display:flex;align-items:center;gap:6px;cursor:pointer">
+      <input type="radio" name="exportFormat" id="fmtMp4" value="mp4" checked> MP4 (Instagram)
+    </label>
+    <label style="font-size:12px;color:#5c4a32;display:flex;align-items:center;gap:6px;cursor:pointer">
+      <input type="radio" name="exportFormat" id="fmtGif" value="gif"> GIF (Reddit)
+    </label>
+  </div>
+
+  <button class="btn btn-green" id="buildReelBtn" disabled>Build reel</button>
+
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bg"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-lbl" id="progressLbl">Rendering...</div>
+  </div>
+
+  <div class="output-wrap" id="outputWrap"></div>
+
+  <div id="markersWrap" style="display:none;margin-top:14px;background:#f0ebe3;border:1px solid #e0d6c8;border-radius:8px;padding:12px;">
+    <div style="font-size:10px;color:#a8967c;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">Music timing markers</div>
+    <div id="markersList" style="font-size:11px;color:#6b5540;line-height:1.9;"></div>
+    <p class="note">Use these timestamps to line up a beat drop or transition in CapCut when adding music.</p>
+  </div>
+</div>
+
+<!-- COVER PREVIEW -->
+<div class="card" id="coverCard" style="display:none">
+  <div class="card-title"><span class="step-num">5</span> Film memory cover</div>
+  <canvas id="coverCanvas" style="width:100%;border-radius:8px;display:block;background:#000"></canvas>
+  <a class="dl-link" id="coverDl" download="film-memory-cover.jpg">Download cover image</a>
+</div>
+
+<!-- DIAGNOSTICS PANEL -->
+<div class="card" style="margin-top:24px">
+  <div class="card-title" id="diagToggle" style="cursor:pointer;user-select:none">
+    <span class="step-num">✓</span> Diagnostics
+    <span style="color:#b0987a;margin-left:auto;font-size:9px">TAP TO RUN</span>
+  </div>
+  <div id="diagBody" style="display:none">
+    <button class="btn btn-outline" id="runDiagBtn" style="margin-bottom:12px;background:#faf6f0;border:1px solid #d4c8b8;color:#6b5540;">▶ Run all checks</button>
+    <div id="diagResults" style="font-size:11px;line-height:2;"></div>
+  </div>
+</div>
+
+<script>
+const fileInput = document.getElementById('fileInput');
+const dropZone = document.getElementById('dropZone');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const canvasWrap = document.getElementById('canvasWrap');
+const anchorDot = document.getElementById('anchorDot');
+const applyBtn = document.getElementById('applyBtn');
+const exportJpgBtn = document.getElementById('exportJpgBtn');
+const buildReelBtn = document.getElementById('buildReelBtn');
+const photoQueueEl = document.getElementById('photoQueue');
+
+const MAX_DIM = 1600;
+const MAX_PHOTOS = 8;
+
+// Photo queue — each entry: { id, baseImageData, gradedImageData, anchor, thumbDataUrl }
+let photoQueue = [];
+let activePhotoId = null;
+
+function getActive() { return photoQueue.find(p => p.id === activePhotoId) || null; }
+
+function setStatus(msg, color) {
+  let el = document.getElementById('uploadStatus');
+  if (!el) {
+    el = document.createElement('p');
+    el.id = 'uploadStatus';
+    el.style.cssText = 'font-size:12px;margin-top:8px;padding:6px 10px;border-radius:6px;text-align:center;';
+    document.getElementById('photoQueue').parentNode.insertBefore(el, document.getElementById('photoQueue'));
+  }
+  el.textContent = msg;
+  el.style.background = color === 'ok' ? '#e8f4ee' : color === 'err' ? '#fde8e8' : '#f0ebe3';
+  el.style.color = color === 'ok' ? '#2e8c5a' : color === 'err' ? '#c0392b' : '#6b5540';
+}
+
+function loadFiles(files) {
+  const available = MAX_PHOTOS - photoQueue.length;
+  const toLoad = Array.from(files).slice(0, available);
+  if (!toLoad.length) { setStatus('Queue full (max 8 photos)', 'err'); return; }
+
+  setStatus(`Loading ${toLoad.length} photo${toLoad.length > 1 ? 's' : ''}...`, 'info');
+
+  let loaded = 0;
+  toLoad.forEach(file => {
+    // createObjectURL is faster and more reliable on Android than FileReader
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        let w = img.naturalWidth || img.width;
+        let h = img.naturalHeight || img.height;
+        if (!w || !h) throw new Error('Image has zero dimensions');
+        if (w > MAX_DIM || h > MAX_DIM) {
+          const scale = MAX_DIM / Math.max(w, h);
+          w = Math.round(w * scale); h = Math.round(h * scale);
+        }
+        const baseCanvas = document.createElement('canvas');
+        baseCanvas.width = w; baseCanvas.height = h;
+        baseCanvas.getContext('2d').drawImage(img, 0, 0, w, h);
+
+        const thumbW = 80, thumbH = Math.max(1, Math.round(h / w * thumbW));
+        const thumbC = document.createElement('canvas');
+        thumbC.width = thumbW; thumbC.height = thumbH;
+        thumbC.getContext('2d').drawImage(img, 0, 0, thumbW, thumbH);
+        const thumbDataUrl = thumbC.toDataURL('image/jpeg', 0.7);
+
+        URL.revokeObjectURL(objectUrl);
+
+        const id = Date.now() + Math.random();
+        photoQueue.push({ id, baseCanvas, gradedCanvas: null, anchor: { xPct: 0.5, yPct: 0.32 }, thumbDataUrl });
+        if (!activePhotoId) setActivePhoto(id);
+        renderQueue();
+        updateButtons();
+        updateTotalDuration();
+
+        loaded++;
+        if (loaded === toLoad.length) {
+          setStatus(`${photoQueue.length} photo${photoQueue.length > 1 ? 's' : ''} loaded — now tap Apply Recipe`, 'ok');
+        }
+      } catch(err) {
+        URL.revokeObjectURL(objectUrl);
+        setStatus('Error loading photo: ' + err.message, 'err');
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      setStatus('Could not load this image — try a JPG or PNG', 'err');
+    };
+    img.src = objectUrl;
+  });
+}
+
+function setActivePhoto(id) {
+  activePhotoId = id;
+  const p = photoQueue.find(q => q.id === id);
+  if (!p) return;
+  const src = p.gradedCanvas || p.baseCanvas;
+  canvas.width = src.width;
+  canvas.height = src.height;
+  ctx.drawImage(src, 0, 0);
+  canvasWrap.classList.add('show');
+  placeAnchorDot();
+  renderQueue();
+}
+
+function removePhoto(id) {
+  photoQueue = photoQueue.filter(p => p.id !== id);
+  if (activePhotoId === id) {
+    activePhotoId = photoQueue.length ? photoQueue[0].id : null;
+    if (activePhotoId) setActivePhoto(activePhotoId);
+    else { canvasWrap.classList.remove('show'); anchorDot.style.display = 'none'; }
+  }
+  renderQueue();
+  updateButtons();
+  updateTotalDuration();
+}
+
+function movePhoto(id, dir) {
+  const i = photoQueue.findIndex(p => p.id === id);
+  const j = i + dir;
+  if (j < 0 || j >= photoQueue.length) return;
+  [photoQueue[i], photoQueue[j]] = [photoQueue[j], photoQueue[i]];
+  renderQueue();
+  updateTotalDuration();
+}
+
+function renderQueue() {
+  if (!photoQueue.length) { photoQueueEl.style.display = 'none'; return; }
+  photoQueueEl.style.display = 'block';
+  photoQueueEl.innerHTML = `
+    <div style="font-size:10px;color:#a8967c;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">${photoQueue.length} photo${photoQueue.length>1?'s':''} — tap to preview &amp; set focal point</div>
+    <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">
+      ${photoQueue.map((p, i) => `
+        <div style="flex-shrink:0;position:relative;border:2px solid ${p.id===activePhotoId?'#2e8c5a':'#d4c8b8'};border-radius:6px;overflow:hidden;cursor:pointer" data-id="${p.id}" class="queue-thumb">
+          <img src="${p.thumbDataUrl}" style="display:block;width:80px;height:100px;object-fit:cover">
+          <div style="position:absolute;top:2px;left:3px;font-size:9px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.8)">${i+1}</div>
+          ${p.gradedCanvas ? '<div style="position:absolute;top:2px;right:3px;font-size:9px;color:#2e8c5a;font-weight:700">✓</div>' : ''}
+          <div style="position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:space-between;background:rgba(60,40,10,0.5);padding:2px 3px">
+            ${i > 0 ? `<span class="q-btn" data-action="left" data-id="${p.id}" style="color:#e8e0d4;font-size:11px;cursor:pointer;padding:1px 4px">◀</span>` : '<span></span>'}
+            <span class="q-btn" data-action="del" data-id="${p.id}" style="color:#f08080;font-size:11px;cursor:pointer;padding:1px 4px">✕</span>
+            ${i < photoQueue.length-1 ? `<span class="q-btn" data-action="right" data-id="${p.id}" style="color:#e8e0d4;font-size:11px;cursor:pointer;padding:1px 4px">▶</span>` : '<span></span>'}
+          </div>
+        </div>
+      `).join('')}
+      ${photoQueue.length < MAX_PHOTOS ? `
+        <div style="flex-shrink:0;width:80px;height:100px;border:1.5px dashed #d4c8b8;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#b0987a;font-size:22px" id="addMoreBtn">+</div>
+      ` : ''}
+    </div>
+  `;
+  photoQueueEl.querySelectorAll('.queue-thumb').forEach(el => {
+    el.addEventListener('click', () => setActivePhoto(parseFloat(el.dataset.id)));
+  });
+  photoQueueEl.querySelectorAll('.q-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const id = parseFloat(btn.dataset.id);
+      if (btn.dataset.action === 'del') removePhoto(id);
+      else if (btn.dataset.action === 'left') movePhoto(id, -1);
+      else if (btn.dataset.action === 'right') movePhoto(id, 1);
+    });
+  });
+  const addMoreBtn = document.getElementById('addMoreBtn');
+  if (addMoreBtn) addMoreBtn.addEventListener('click', () => { const t = document.createElement('input'); t.type='file'; t.accept='image/*'; t.multiple=true; t.style.display='none'; document.body.appendChild(t); t.addEventListener('change', e => { loadFiles(e.target.files); document.body.removeChild(t); }); t.click(); });
+}
+
+function updateButtons() {
+  const hasPhoto = photoQueue.length > 0;
+  applyBtn.disabled = !hasPhoto;
+  exportJpgBtn.disabled = !getActive()?.gradedCanvas;
+  buildReelBtn.disabled = !photoQueue.some(p => p.gradedCanvas);
+}
+
+function updateTotalDuration() {
+  const zoomSec = parseInt(document.getElementById('duration').value) || 6;
+  const n = Math.max(1, photoQueue.length);
+  const coverLabel = document.getElementById('coverLabel')?.value?.trim() || '';
+  const totalSec = (n * zoomSec) + ((n - 1) * 1.5) + (coverLabel ? 3.2 : 0);
+  const el = document.getElementById('totalDurVal');
+  if (el) el.textContent = totalSec.toFixed(1) + 's' + (n > 1 ? ` (${n} photos)` : '');
+}
+
+fileInput.addEventListener('change', e => { loadFiles(e.target.files); e.target.value = ''; });
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); loadFiles(e.dataTransfer.files); });
+
+canvas.addEventListener('click', e => {
+  const p = getActive();
+  if (!p) return;
+  const rect = canvas.getBoundingClientRect();
+  p.anchor.xPct = (e.clientX - rect.left) / rect.width;
+  p.anchor.yPct = (e.clientY - rect.top) / rect.height;
+  placeAnchorDot();
+});
+
+function placeAnchorDot() {
+  const p = getActive();
+  if (!p) return;
+  anchorDot.style.display = 'block';
+  anchorDot.style.left = (p.anchor.xPct * 100) + '%';
+  anchorDot.style.top = (p.anchor.yPct * 100) + '%';
+}
+
+// ---- Core helpers ----
+function clamp(v) { return v < 0 ? 0 : v > 255 ? 255 : v; }
+
+function addGrain(p, idx, amount) {
+  if (amount <= 0) return;
+  const n = (Math.random() - 0.5) * amount;
+  p[idx] = clamp(p[idx] + n);
+  p[idx+1] = clamp(p[idx+1] + n);
+  p[idx+2] = clamp(p[idx+2] + n);
+}
+
+
+// ==================== Film LUT engine ====================
+// Each recipe is defined as a set of parameters fed into a shared grading pipeline:
+//   1. sRGB → linear (remove gamma)
+//   2. 3x3 color mixing matrix (cross-channel bleed, like dye layers in film)
+//   3. Per-channel S-curve tone mapping (shadows / midtones / highlights independently)
+//   4. Global luminance S-curve
+//   5. Shadow tint + highlight tint (split toning)
+//   6. Saturation (HSL, applied after toning)
+//   7. linear → sRGB (re-apply gamma)
+// Precomputed into a 256-entry LUT per recipe for performance.
+
+function srgbToLinear(v) {
+  v /= 255;
+  return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+}
+function linearToSrgb(v) {
+  v = v < 0 ? 0 : v > 1 ? 1 : v;
+  return (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055) * 255;
+}
+
+// Catmull-Rom spline through control points [[x,y], ...] → function(t) -> value
+function makeCurve(points) {
+  return function(x) {
+    x = Math.max(0, Math.min(1, x));
+    for (let i = 0; i < points.length - 1; i++) {
+      const [x0, y0] = points[i], [x1, y1] = points[i + 1];
+      if (x <= x1 || i === points.length - 2) {
+        const t = x1 === x0 ? 0 : (x - x0) / (x1 - x0);
+        // cubic ease in-out between points, using neighboring slopes for smoothness
+        const p0 = i > 0 ? points[i - 1] : points[i];
+        const p3 = i < points.length - 2 ? points[i + 2] : points[i + 1];
+        const m0 = (y1 - p0[1]) / 2, m1 = (p3[1] - y0) / 2;
+        const t2 = t * t, t3 = t2 * t;
+        return (2*t3 - 3*t2 + 1)*y0 + (t3 - 2*t2 + t)*m0 + (-2*t3 + 3*t2)*y1 + (t3 - t2)*m1;
+      }
+    }
+    return points[points.length - 1][1];
+  };
+}
+
+// Build a 256-entry precomputed LUT from a curve function (input 0-1, output 0-1)
+function buildLUT(curveFn) {
+  const lut = new Float32Array(256);
+  for (let i = 0; i < 256; i++) lut[i] = curveFn(i / 255);
+  return lut;
+}
+
+// Apply a 3x3 matrix to linear RGB (values 0-1). Matrix is row-major [R_out, G_out, B_out].
+function applyMatrix(r, g, b, m) {
+  return [
+    m[0]*r + m[1]*g + m[2]*b,
+    m[3]*r + m[4]*g + m[5]*b,
+    m[6]*r + m[7]*g + m[8]*b
+  ];
+}
+
+// Split toning: shadowColor/highlightColor are [r,g,b] in 0-1, strength 0-1
+function splitTone(r, g, b, shadowColor, shadowStr, highlightColor, highlightStr) {
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  // Shadow: affects dark tones (1-lum), highlight: affects bright tones (lum)
+  const sw = Math.max(0, 1 - lum * 2.2) * shadowStr;
+  const hw = Math.max(0, lum * 2.2 - 1.2) * highlightStr;
+  return [
+    r + (shadowColor[0] - r) * sw + (highlightColor[0] - r) * hw,
+    g + (shadowColor[1] - g) * sw + (highlightColor[1] - g) * hw,
+    b + (shadowColor[2] - b) * sw + (highlightColor[2] - b) * hw
+  ];
+}
+
+function buildRecipeLUT(def) {
+  const rCurve = buildLUT(makeCurve(def.curveR));
+  const gCurve = buildLUT(makeCurve(def.curveG));
+  const bCurve = buildLUT(makeCurve(def.curveB));
+  const lCurve = buildLUT(makeCurve(def.curveLum));
+
+  // Precompute linear LUT for sRGB decoding
+  const linTable = new Float32Array(256);
+  for (let i = 0; i < 256; i++) linTable[i] = srgbToLinear(i);
+
+  return function(r0, g0, b0) {
+    // 1. to linear
+    let r = linTable[r0], g = linTable[g0], b = linTable[b0];
+
+    // 2. color mixing matrix
+    if (def.matrix) [r, g, b] = applyMatrix(r, g, b, def.matrix);
+    r = r < 0 ? 0 : r > 1 ? 1 : r;
+    g = g < 0 ? 0 : g > 1 ? 1 : g;
+    b = b < 0 ? 0 : b > 1 ? 1 : b;
+
+    // 3. per-channel curves (apply in linear light)
+    r = rCurve[Math.round(r * 255)];
+    g = gCurve[Math.round(g * 255)];
+    b = bCurve[Math.round(b * 255)];
+
+    // 4. global luminance curve
+    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const lumMapped = lCurve[Math.round(lum * 255)];
+    const lumScale = lum > 0.001 ? lumMapped / lum : 1;
+    r *= lumScale; g *= lumScale; b *= lumScale;
+
+    // 5. split toning
+    if (def.shadowColor || def.highlightColor) {
+      [r, g, b] = splitTone(r, g, b,
+        def.shadowColor || [0,0,0], def.shadowStr || 0,
+        def.highlightColor || [1,1,1], def.highlightStr || 0
+      );
+    }
+
+    // 6. saturation
+    if (def.saturation !== 0) {
+      const l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      const s = def.saturation;
+      r = l + (r - l) * (1 + s);
+      g = l + (g - l) * (1 + s);
+      b = l + (b - l) * (1 + s);
+    }
+
+    // 7. back to sRGB
+    return [
+      clamp(linearToSrgb(r)),
+      clamp(linearToSrgb(g)),
+      clamp(linearToSrgb(b))
+    ];
+  };
+}
+
+// ---- Recipe definitions ----
+// Curves are control points [[linear_in, linear_out], ...], values 0-1.
+// The identity is [[0,0],[1,1]]. Lifting the shadow end fades blacks; pulling
+// the highlight end down reduces highlight contrast.
+
+const RECIPE_DEFS = {
+  portra400: {
+    // Kodak Portra 400 — the portrait standard.
+    // Lifted milky shadows, warm skin, gentle highlight rolloff.
+    curveR: [[0,0.02],[0.25,0.29],[0.5,0.55],[0.75,0.79],[1,0.98]],
+    curveG: [[0,0.015],[0.25,0.265],[0.5,0.52],[0.75,0.77],[1,0.97]],
+    curveB: [[0,0.025],[0.25,0.255],[0.5,0.49],[0.75,0.73],[1,0.93]],
+    curveLum: [[0,0.015],[0.25,0.235],[0.5,0.49],[0.75,0.75],[1,0.97]],
+    matrix: [1.04,-0.02,-0.02, 0.01,1.00,-0.01, -0.02,-0.01,1.03],
+    shadowColor: [0.16,0.10,0.07], shadowStr: 0.08,
+    highlightColor: [1.0,0.97,0.92], highlightStr: 0.14,
+    saturation: -0.08
+  },
+
+  gold200: {
+    // Kodak Gold 200 — warm consumer film.
+    // Warmer than Portra: golden-orange highlights, slight green in shadows.
+    // Skin reads golden-warm. More saturation than Portra. Classic holiday feel.
+    curveR: [[0,0.01],[0.25,0.30],[0.5,0.57],[0.75,0.82],[1,0.99]],
+    curveG: [[0,0.01],[0.25,0.27],[0.5,0.535],[0.75,0.785],[1,0.97]],
+    curveB: [[0,0.02],[0.25,0.24],[0.5,0.485],[0.75,0.725],[1,0.91]],
+    curveLum: [[0,0.01],[0.25,0.245],[0.5,0.505],[0.75,0.77],[1,0.98]],
+    matrix: [1.05,-0.02,-0.03, 0.01,1.02,-0.03, -0.02,-0.01,1.03],
+    shadowColor: [0.06,0.10,0.06], shadowStr: 0.14,
+    highlightColor: [1.0,0.96,0.84], highlightStr: 0.18,
+    saturation: 0.10
+  },
+
+  trix400: {
+    // Kodak Tri-X 400 — classic high-contrast B&W.
+    // Strong S-curve, punchy blacks, slight warm highlight tint.
+    curveR: [[0,0],[0.2,0.14],[0.5,0.52],[0.8,0.90],[1,1]],
+    curveG: [[0,0],[0.2,0.14],[0.5,0.52],[0.8,0.90],[1,1]],
+    curveB: [[0,0],[0.2,0.14],[0.5,0.52],[0.8,0.90],[1,1]],
+    curveLum: [[0,0],[0.18,0.10],[0.5,0.52],[0.82,0.93],[1,1]],
+    matrix: null,
+    shadowColor: [0,0,0], shadowStr: 0,
+    highlightColor: [1.0,0.98,0.94], highlightStr: 0.18,
+    saturation: -1.0,
+    bw: true
+  }
+};
+
+// Build all LUTs once at startup
+const RECIPES = {};
+for (const [key, def] of Object.entries(RECIPE_DEFS)) {
+  if (def.bw) {
+    // For B&W, convert to luma first then apply a single curve
+    const lumIn = new Float32Array(256);
+    for (let i = 0; i < 256; i++) lumIn[i] = srgbToLinear(i);
+    const lCurve = buildLUT(makeCurve(def.curveLum));
+    const hColor = def.highlightColor || [1,1,1];
+    const hStr = def.highlightStr || 0;
+    RECIPES[key] = (r0, g0, b0) => {
+      const lum = 0.2126 * lumIn[r0] + 0.7152 * lumIn[g0] + 0.0722 * lumIn[b0];
+      let v = lCurve[Math.round(lum * 255)];
+      // Slight warm highlight tint
+      const hw = Math.max(0, v * 2 - 1) * hStr;
+      const rv = v + (hColor[0] - v) * hw;
+      const gv = v + (hColor[1] - v) * hw;
+      const bv = v + (hColor[2] - v) * hw;
+      return [clamp(linearToSrgb(rv)), clamp(linearToSrgb(gv)), clamp(linearToSrgb(bv))];
+    };
+  } else {
+    RECIPES[key] = buildRecipeLUT(def);
+  }
+}
+
+const RECIPE_DESCRIPTIONS = {
+  portra400: 'Soft, warm, low-contrast skin tones — best for portraits, golden hour, and relaxed everyday shots.',
+  gold200: 'Warm, slightly saturated consumer film look — orange-yellow highlights, green-leaning shadows, golden skin tones.',
+  trix400: 'High-contrast black & white with a touch of warmth in the highlights — classic for moody portrait and street shots.'
+};
+const RECIPE_NAMES = {
+  portra400: 'Kodak Portra 400', gold200: 'Kodak Gold 200', trix400: 'Kodak Tri-X 400 (B&W)'
+};
+const recipeSelectEl = document.getElementById('recipe');
+const recipeDescEl = document.getElementById('recipeDesc');
+const recipePickerBtn = document.getElementById('recipePickerBtn');
+const recipePickerLabel = document.getElementById('recipePickerLabel');
+const recipeModalOverlay = document.getElementById('recipeModalOverlay');
+const recipeModalList = document.getElementById('recipeModalList');
+
+function setRecipe(value) {
+  recipeSelectEl.value = value;
+  recipePickerLabel.textContent = RECIPE_NAMES[value] || value;
+  recipeDescEl.textContent = RECIPE_DESCRIPTIONS[value] || '';
+  if (photoQueue.length) applyRecipe();
+}
+
+function buildRecipeModal() {
+  recipeModalList.innerHTML = Object.keys(RECIPE_NAMES).map(key => `
+    <div class="recipe-row" data-value="${key}" style="padding:18px 20px;border-bottom:1px solid #e8e0d4;cursor:pointer;">
+      <div style="font-size:19px;color:#2a2118;font-family:Georgia, serif;">${RECIPE_NAMES[key]}</div>
+      <div style="font-size:12.5px;color:#8a7560;margin-top:4px;line-height:1.5;">${RECIPE_DESCRIPTIONS[key]}</div>
+    </div>
+  `).join('');
+  recipeModalList.querySelectorAll('.recipe-row').forEach(row => {
+    row.addEventListener('click', () => {
+      setRecipe(row.getAttribute('data-value'));
+      recipeModalOverlay.style.display = 'none';
+    });
+  });
+}
+buildRecipeModal();
+
+recipePickerBtn.addEventListener('click', () => { recipeModalOverlay.style.display = 'flex'; });
+recipeModalOverlay.addEventListener('click', e => { if (e.target === recipeModalOverlay) recipeModalOverlay.style.display = 'none'; });
+
+
+function gradeImageData(srcCanvas) {
+  // Takes a canvas, returns a new graded canvas
+  const w = srcCanvas.width, h = srcCanvas.height;
+  const tmp = document.createElement('canvas');
+  tmp.width = w; tmp.height = h;
+  const tctx = tmp.getContext('2d');
+  tctx.drawImage(srcCanvas, 0, 0);
+  const imageData = tctx.getImageData(0, 0, w, h);
+  const src = imageData.data;
+  const recipeFn = RECIPES[document.getElementById('recipe').value];
+  const strength = parseInt(document.getElementById('strength').value) / 100;
+  const grainAmt = parseInt(document.getElementById('grain').value) / 100 * 22;
+
+  for (let i = 0; i < src.length; i += 4) {
+    const r0 = src[i], g0 = src[i+1], b0 = src[i+2];
+    const [r1, g1, b1] = recipeFn(r0, g0, b0);
+    src[i]   = clamp(r0 + (r1 - r0) * strength);
+    src[i+1] = clamp(g0 + (g1 - g0) * strength);
+    src[i+2] = clamp(b0 + (b1 - b0) * strength);
+    addGrain(src, i, grainAmt);
+  }
+  tctx.putImageData(imageData, 0, 0);
+  return tmp;
+}
+
+function applyRecipe() {
+  if (!photoQueue.length) return;
+  // Grade every photo in the queue
+  photoQueue.forEach(p => {
+    p.gradedCanvas = gradeImageData(p.baseCanvas);
+  });
+  // Show the active photo's graded result
+  const active = getActive();
+  if (active) { const s = active.gradedCanvas; canvas.width = s.width; canvas.height = s.height; ctx.drawImage(s, 0, 0); }
+  renderQueue();
+  updateButtons();
+  updateScrubAvailability();
+}
+
+applyBtn.addEventListener('click', applyRecipe);
+
+document.getElementById('strength').addEventListener('input', e => {
+  document.getElementById('strengthVal').textContent = e.target.value + '%';
+  if (photoQueue.length) applyRecipe();
+});
+document.getElementById('grain').addEventListener('input', e => {
+  document.getElementById('grainVal').textContent = e.target.value;
+  if (photoQueue.length) applyRecipe();
+});
+document.getElementById('duration').addEventListener('input', e => {
+  document.getElementById('durVal').textContent = e.target.value + 's';
+  updateTotalDuration();
+  updateScrubAvailability();
+});
+document.getElementById('zoomAmt').addEventListener('input', e => {
+  document.getElementById('zoomVal').textContent = e.target.value + '%';
+  updateScrubAvailability();
+});
+document.getElementById('panDirection').addEventListener('change', updateScrubAvailability);
+document.getElementById('fitMode').addEventListener('change', updateScrubAvailability);
+document.getElementById('frameStyle').addEventListener('change', updateScrubAvailability);
+document.getElementById('dustToggle').addEventListener('change', updateScrubAvailability);
+
+// Watermark toggle
+document.getElementById('wmToggle').addEventListener('change', e => {
+  document.getElementById('wmText').style.display = e.target.checked ? 'block' : 'none';
+  updateScrubAvailability();
+});
+document.getElementById('wmText').addEventListener('input', updateScrubAvailability);
+document.getElementById('leakToggle').addEventListener('change', updateScrubAvailability);
+
+// ---- Export still ----
+function exportJpg() {
+  const active = getActive();
+  if (!active?.gradedCanvas) return;
+  const tmp = active.gradedCanvas;
+  const a = document.createElement('a');
+  a.download = `fuji-${document.getElementById('recipe').value}-${Date.now()}.jpg`;
+  a.href = tmp.toDataURL('image/jpeg', 0.94);
+  a.click();
+}
+exportJpgBtn.addEventListener('click', exportJpg);
+
+// ---- Build slow-zoom reel toward focal point ----
+// ==================== Shared rendering pipeline ====================
+// Used by both the final video export (buildReel) and the instant scrub preview,
+// so "what you see while scrubbing" is exactly what gets recorded.
+
+const REEL_W = 1080, REEL_H = 1920;
+const FPS = 30;
+
+function easeSine(t) { return -(Math.cos(Math.PI * t) - 1) / 2; }
+function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+function canvasFromImageData(data) {
+  const c = document.createElement('canvas');
+  c.width = data.width; c.height = data.height;
+  c.getContext('2d').putImageData(data, 0, 0);
+  return c;
+}
+
+function drawCoverFittedOnCtx(octx, image, W, H) {
+  const ia = image.width / image.height, ca = W / H;
+  let dw, dh;
+  if (ia > ca) { dh = H; dw = H * ia; } else { dw = W; dh = W / ia; }
+  octx.drawImage(image, (W - dw) / 2, (H - dh) / 2, dw, dh);
+}
+
+// Contain-fit: full photo visible, black bars fill the rest
+function drawContainFittedOnCtx(octx, image, W, H) {
+  const ia = image.width / image.height, ca = W / H;
+  let dw, dh;
+  if (ia > ca) { dw = W; dh = W / ia; } else { dh = H; dw = H * ia; }
+  octx.fillStyle = '#000';
+  octx.fillRect(0, 0, W, H);
+  octx.drawImage(image, (W - dw) / 2, (H - dh) / 2, dw, dh);
+}
+
+function drawImageOnCtx(octx, image, W, H, fitMode) {
+  if (fitMode === 'contain') drawContainFittedOnCtx(octx, image, W, H);
+  else drawCoverFittedOnCtx(octx, image, W, H);
+}
+
+function computePanRange(anchorObj, W, H, panDirection) {
+  const ax = anchorObj.xPct * W, ay = anchorObj.yPct * H;
+  const panSpan = 0.16;
+  let ax0 = ax, ay0 = ay, ax1 = ax, ay1 = ay;
+  if (panDirection === 'lr') { ax0 = ax - W * panSpan / 2; ax1 = ax + W * panSpan / 2; }
+  else if (panDirection === 'rl') { ax0 = ax + W * panSpan / 2; ax1 = ax - W * panSpan / 2; }
+  else if (panDirection === 'tb') { ay0 = ay - H * panSpan / 2; ay1 = ay + H * panSpan / 2; }
+  else if (panDirection === 'bt') { ay0 = ay + H * panSpan / 2; ay1 = ay - H * panSpan / 2; }
+  const marginX = W * 0.12, marginY = H * 0.12;
+  ax0 = Math.min(Math.max(ax0, marginX), W - marginX);
+  ax1 = Math.min(Math.max(ax1, marginX), W - marginX);
+  ay0 = Math.min(Math.max(ay0, marginY), H - marginY);
+  ay1 = Math.min(Math.max(ay1, marginY), H - marginY);
+  return { ax0, ay0, ax1, ay1 };
+}
+
+// --- Dust & scratch overlay ---
+function drawDustScratchesOnCtx(octx, W, H) {
+  octx.save();
+  octx.fillStyle = '#fff';
+  for (let i = 0; i < 14; i++) {
+    const x = Math.random() * W, y = Math.random() * H;
+    const r = Math.random() * 1.4 + 0.3;
+    octx.globalAlpha = Math.random() * 0.4 + 0.1;
+    octx.beginPath();
+    octx.arc(x, y, r, 0, Math.PI * 2);
+    octx.fill();
+  }
+  if (Math.random() < 0.18) {
+    const sx = Math.random() * W;
+    octx.globalAlpha = Math.random() * 0.25 + 0.08;
+    octx.strokeStyle = '#fff';
+    octx.lineWidth = Math.random() * 1 + 0.5;
+    octx.beginPath();
+    octx.moveTo(sx, 0);
+    octx.lineTo(sx + (Math.random() * 6 - 3), H);
+    octx.stroke();
+  }
+  octx.restore();
+}
+
+// --- Light leak ---
+function drawLightLeakOnCtx(octx, W, H, progress) {
+  const pulse = 0.5 + 0.5 * Math.sin(progress * Math.PI);
+  octx.save();
+  octx.globalCompositeOperation = 'screen';
+  octx.globalAlpha = 0.35 * pulse;
+  const grad = octx.createRadialGradient(W * 0.85, H * 0.08, 0, W * 0.85, H * 0.08, H * 0.65);
+  grad.addColorStop(0, 'rgba(255,200,120,0.9)');
+  grad.addColorStop(0.5, 'rgba(255,140,80,0.35)');
+  grad.addColorStop(1, 'rgba(255,140,80,0)');
+  octx.fillStyle = grad;
+  octx.fillRect(0, 0, W, H);
+  octx.restore();
+}
+
+// Watermark: semi-transparent box, centered horizontally, 1/3 from bottom
+function drawWatermarkOnCtx(octx, W, H, text) {
+  if (!text) return;
+  const fontSize = Math.round(W * 0.028);
+  octx.save();
+  octx.font = `600 ${fontSize}px 'Helvetica Neue', Helvetica, Arial, sans-serif`;
+  octx.textBaseline = 'middle';
+  const pad = fontSize * 0.55;
+  const tw = octx.measureText(text).width;
+  const bw = tw + pad * 2;
+  const bh = fontSize + pad * 1.4;
+  const bx = (W - bw) / 2;            // centered horizontally
+  const by = H * 0.667 - bh / 2;     // 1/3 from bottom
+  // Box — 80% transparency = 20% opacity
+  octx.globalAlpha = 0.20;
+  octx.fillStyle = '#000000';
+  octx.beginPath();
+  octx.roundRect(bx, by, bw, bh, fontSize * 0.3);
+  octx.fill();
+  // Text at full opacity
+  octx.globalAlpha = 1;
+  octx.fillStyle = '#ffffff';
+  octx.fillText(text, bx + pad, by + bh / 2);
+  octx.restore();
+}
+
+// --- Frame border treatment ---
+function roundRectOnCtx(octx, x, y, w, h, r, fill) {
+  octx.beginPath();
+  octx.moveTo(x + r, y);
+  octx.arcTo(x + w, y, x + w, y + h, r);
+  octx.arcTo(x + w, y + h, x, y + h, r);
+  octx.arcTo(x, y + h, x, y, r);
+  octx.arcTo(x, y, x + w, y, r);
+  octx.closePath();
+  octx.fillStyle = fill;
+  octx.fill();
+}
+function drawFrameBorderOnCtx(octx, W, H, style) {
+  if (style === 'none') return;
+  octx.save();
+  if (style === 'white' || style === 'black') {
+    const bw = W * 0.045;
+    octx.fillStyle = style === 'white' ? '#f4f0e8' : '#000';
+    octx.fillRect(0, 0, W, bw);
+    octx.fillRect(0, H - bw, W, bw);
+    octx.fillRect(0, 0, bw * 0.4, H);
+    octx.fillRect(W - bw * 0.4, 0, bw * 0.4, H);
+  } else if (style === 'rebate') {
+    const bw = W * 0.05;
+    octx.fillStyle = '#111';
+    octx.fillRect(0, 0, W, bw);
+    octx.fillRect(0, H - bw, W, bw);
+    octx.fillStyle = '#888';
+    octx.font = '20px monospace';
+    octx.textAlign = 'left';
+    octx.fillText('FUJI 400  ◯ ◯ ◯ ◯ ◯ ◯', 14, bw * 0.65);
+    octx.fillText('24A  ' + new Date().getFullYear(), 14, H - bw * 0.3);
+  } else if (style === 'sprocket') {
+    const bw = W * 0.07;
+    octx.fillStyle = '#000';
+    octx.fillRect(0, 0, W, bw);
+    octx.fillRect(0, H - bw, W, bw);
+    const holeW = bw * 0.34, holeH = bw * 0.5, gap = bw * 0.55;
+    for (let x = gap / 2; x < W; x += holeW + gap) {
+      roundRectOnCtx(octx, x, bw * 0.25, holeW, holeH, 3, '#1c1c1c');
+      roundRectOnCtx(octx, x, H - bw + bw * 0.25, holeW, holeH, 3, '#1c1c1c');
+    }
+  } else if (style === 'polaroid') {
+    const side = W * 0.05, top = W * 0.05, bottom = H * 0.16;
+    octx.fillStyle = '#f7f4ec';
+    octx.fillRect(0, 0, W, top);
+    octx.fillRect(0, H - bottom, W, bottom);
+    octx.fillRect(0, 0, side, H);
+    octx.fillRect(W - side, 0, side, H);
+  } else if (style === 'instax') {
+    const side = W * 0.035, top = W * 0.035, bottom = H * 0.09;
+    octx.fillStyle = '#fff';
+    octx.fillRect(0, 0, W, top);
+    octx.fillRect(0, H - bottom, W, bottom);
+    octx.fillRect(0, 0, side, H);
+    octx.fillRect(W - side, 0, side, H);
+  } else if (style === 'vignette') {
+    const grad = octx.createRadialGradient(W/2, H/2, H*0.35, W/2, H/2, H*0.72);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.55)');
+    octx.fillStyle = grad;
+    octx.fillRect(0, 0, W, H);
+  }
+  octx.restore();
+}
+
+// --- Film memory cover card (scatter-appear, then converge as molten metal) ---
+function wrapLinesOnCtx(octx, text, font, maxWidth) {
+  octx.font = font;
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (octx.measureText(test).width > maxWidth && line) { lines.push(line); line = w; }
+    else { line = test; }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+const APPEAR_FRAC = 0.28;
+let cachedCoverLayout = { key: null, layout: null };
+function getCoverCharLayout(octx, W, H, coverLabel) {
+  const key = coverLabel + '|' + W + '|' + H;
+  if (cachedCoverLayout.key === key) return cachedCoverLayout.layout;
+
+  const font = '300 64px Georgia, serif';
+  const lineHeight = 74;
+  octx.font = font;
+  const lines = wrapLinesOnCtx(octx, coverLabel, font, W * 0.82);
+  const startY = H * 0.667 - (lines.length - 1) * lineHeight / 2;
+
+  const order = [];
+  lines.forEach((line, li) => {
+    const fullWidth = octx.measureText(line).width;
+    let cx = W / 2 - fullWidth / 2;
+    const y = startY + li * lineHeight;
+    for (const ch of line) {
+      const w = octx.measureText(ch).width;
+      if (ch !== ' ') order.push({ ch, finalX: cx + w / 2, finalY: y });
+      cx += w;
+    }
+  });
+
+  const marginX = W * 0.08, marginY = H * 0.1;
+  const layout = order.map(c => ({
+    ch: c.ch, finalX: c.finalX, finalY: c.finalY,
+    startX: marginX + Math.random() * (W - marginX * 2),
+    startY: marginY + Math.random() * (H - marginY * 2),
+    appearDelay: Math.random() * (APPEAR_FRAC * 0.7),
+    wobble: (Math.random() - 0.5) * 0.3
+  }));
+  cachedCoverLayout = { key, layout };
+  return layout;
+}
+
+function drawCoverCardOnCtx(octx, W, H, bgImage, coverLabel, revealT) {
+  octx.fillStyle = '#0a0a0a';
+  octx.fillRect(0, 0, W, H);
+  octx.save();
+  octx.globalAlpha = 0.92;
+  drawImageOnCtx(octx, bgImage, W, H, timeline.fitMode);
+  octx.fillStyle = 'rgba(0,0,0,0.55)';
+  octx.fillRect(0, 0, W, H);
+  octx.restore();
+
+  const layout = getCoverCharLayout(octx, W, H, coverLabel);
+  octx.font = '300 64px Georgia, serif';
+  octx.textAlign = 'left';
+  octx.textBaseline = 'alphabetic';
+
+  layout.forEach(c => {
+    let x, y, alpha, blurPx, metalMix, wobble;
+    if (revealT < APPEAR_FRAC) {
+      const appearT = Math.max(0, Math.min(1, (revealT - c.appearDelay) / 0.18));
+      x = c.startX; y = c.startY; alpha = appearT; wobble = c.wobble;
+      blurPx = 2.5 * (1 - appearT); metalMix = 0.5;
+    } else {
+      const moveT = Math.max(0, Math.min(1, (revealT - APPEAR_FRAC) / (1 - APPEAR_FRAC)));
+      const eased = easeInOutCubic(moveT);
+      x = c.startX + (c.finalX - c.startX) * eased;
+      y = c.startY + (c.finalY - c.startY) * eased;
+      alpha = 1; wobble = c.wobble * (1 - eased);
+      const landAmount = Math.min(1, moveT * 1.25);
+      blurPx = (1 - landAmount) * 9;
+      metalMix = 1 - landAmount;
+    }
+    const r = Math.round(232 * (1 - metalMix) + 205 * metalMix);
+    const g = Math.round(232 * (1 - metalMix) + 208 * metalMix);
+    const b = Math.round(232 * (1 - metalMix) + 215 * metalMix);
+    octx.save();
+    octx.filter = blurPx > 0.3 ? `blur(${blurPx.toFixed(1)}px)` : 'none';
+    octx.globalAlpha = alpha;
+    octx.fillStyle = `rgb(${r},${g},${b})`;
+    octx.translate(x, y);
+    octx.rotate(wobble);
+    octx.fillText(c.ch, 0, 0);
+    octx.restore();
+  });
+  octx.filter = 'none';
+}
+
+// --- Timeline builder ---
+function buildTimeline() {
+  const gradedPhotos = photoQueue.filter(p => p.gradedCanvas);
+  if (!gradedPhotos.length) return null;
+
+  const durationSec = parseInt(document.getElementById('duration').value);
+  const zoomTarget = 1 + parseInt(document.getElementById('zoomAmt').value) / 100;
+  const panDirection = document.getElementById('panDirection').value;
+  const useDust = document.getElementById('dustToggle').checked;
+  const useLeak = document.getElementById('leakToggle').checked;
+  const frameStyle = document.getElementById('frameStyle').value;
+  const fitMode = document.getElementById('fitMode').value;
+  const coverLabel = document.getElementById('coverLabel').value.trim();
+  const useCover = coverLabel.length > 0;
+  const wmEnabled = document.getElementById('wmToggle').checked;
+  const wmText = wmEnabled ? document.getElementById('wmText').value.trim() : '';
+
+  const crossfadeSec = 1.5;
+  const coverSec = 3.2;
+
+  const slides = [];
+  for (let i = 0; i < gradedPhotos.length; i++) {
+    const p = gradedPhotos[i];
+    const gradedCanvas = p.gradedCanvas;
+    const pan = computePanRange(p.anchor, REEL_W, REEL_H, panDirection);
+
+    if (i === 0) {
+      slides.push({
+        fadeFrom: null, fadeTo: gradedCanvas,
+        transitionFrames: 0,
+        zoomFrames: Math.round(durationSec * FPS),
+        zoomTarget, pan,
+        prevZoom: 1, prevAx: pan.ax0, prevAy: pan.ay0
+      });
+    } else {
+      const prev = slides[i - 1];
+      slides.push({
+        fadeFrom: prev.fadeTo, fadeTo: gradedCanvas,
+        transitionFrames: Math.round(crossfadeSec * FPS),
+        zoomFrames: Math.round(durationSec * FPS),
+        zoomTarget, pan,
+        // Each photo starts fresh at 1x — independent Ken Burns per photo
+        prevZoom: 1, prevAx: pan.ax0, prevAy: pan.ay0,
+        // Track where prev photo ended so we can hold it during fade-out
+        fromFinalZoom: prev.zoomTarget,
+        fromFinalAx: prev.pan.ax1,
+        fromFinalAy: prev.pan.ay1
+      });
+    }
+  }
+
+  const coverFrames = useCover ? Math.round(coverSec * FPS) : 0;
+  const slideFrameTotal = slides.reduce((s, sl) => s + sl.transitionFrames + sl.zoomFrames, 0);
+  const totalFrames = slideFrameTotal + coverFrames;
+
+  return {
+    W: REEL_W, H: REEL_H, FPS, slides, coverFrames, coverLabel, useCover,
+    useDust, useLeak, frameStyle, fitMode, totalFrames, slideFrameTotal,
+    lastSlideFadeTo: slides[slides.length - 1].fadeTo,
+    wmText
+  };
+}
+
+// Renders a single absolute frame index onto the given context. Used by both the
+// recorder loop (sequential) and the scrub bar (random access, instant).
+function renderFrame(octx, timeline, fi) {
+  const { W, H } = timeline;
+  octx.fillStyle = '#000';
+  octx.fillRect(0, 0, W, H);
+
+  let cursor = 0;
+  let inOverlayPhase = false;
+  let matched = false;
+
+  for (const slide of timeline.slides) {
+    const slideStart = cursor;
+    const transEnd = cursor + slide.transitionFrames;
+    const zoomEnd = transEnd + slide.zoomFrames;
+
+    if (fi < transEnd) {
+      // Crossfade: photo 1 fades out (held at final zoom),
+      // photo 2 fades in AND zooms simultaneously from frame 1
+      const local = fi - slideStart;
+      const fade_t = slide.transitionFrames <= 1 ? 1 : local / (slide.transitionFrames - 1);
+      const fadeTEased = easeSine(Math.min(1, Math.max(0, fade_t)));
+
+      // Zoom progress for photo 2 counts from the very start of this slide
+      const totalMotionFrames = slide.transitionFrames + slide.zoomFrames;
+      const zoom_t = local / (totalMotionFrames > 1 ? totalMotionFrames - 1 : 1);
+      const zoom = 1 + (slide.zoomTarget - 1) * zoom_t;
+      const curAx = slide.pan.ax0 + (slide.pan.ax1 - slide.pan.ax0) * zoom_t;
+      const curAy = slide.pan.ay0 + (slide.pan.ay1 - slide.pan.ay0) * zoom_t;
+
+      octx.fillStyle = '#000';
+      octx.fillRect(0, 0, W, H);
+
+      // Photo 1: held at final zoom, fading out
+      const fz = slide.fromFinalZoom || 1;
+      const fax = slide.fromFinalAx || W / 2;
+      const fay = slide.fromFinalAy || H / 2;
+      octx.save();
+      octx.globalAlpha = 1 - fadeTEased;
+      octx.translate(fax, fay);
+      octx.scale(fz, fz);
+      octx.translate(-fax, -fay);
+      drawImageOnCtx(octx, slide.fadeFrom, W, H, timeline.fitMode);
+      octx.restore();
+
+      // Photo 2: fading in AND zooming from frame 1
+      octx.save();
+      octx.globalAlpha = fadeTEased;
+      octx.translate(curAx, curAy);
+      octx.scale(zoom, zoom);
+      octx.translate(-curAx, -curAy);
+      drawImageOnCtx(octx, slide.fadeTo, W, H, timeline.fitMode);
+      octx.restore();
+
+      inOverlayPhase = true;
+      matched = true;
+      break;
+    } else if (fi < zoomEnd) {
+      const local = fi - slideStart;
+      const totalMotionFrames = slide.transitionFrames + slide.zoomFrames;
+      const zoom_t = local / (totalMotionFrames > 1 ? totalMotionFrames - 1 : 1);
+      const zoom = 1 + (slide.zoomTarget - 1) * zoom_t;
+      const curAx = slide.pan.ax0 + (slide.pan.ax1 - slide.pan.ax0) * zoom_t;
+      const curAy = slide.pan.ay0 + (slide.pan.ay1 - slide.pan.ay0) * zoom_t;
+
+      octx.save();
+      octx.translate(curAx, curAy);
+      octx.scale(zoom, zoom);
+      octx.translate(-curAx, -curAy);
+      drawImageOnCtx(octx, slide.fadeTo, W, H, timeline.fitMode);
+      octx.restore();
+      inOverlayPhase = true;
+      matched = true;
+      break;
+    }
+    cursor = zoomEnd;
+  }
+
+  if (!matched) {
+    // Cover card phase
+    const ci = fi - timeline.slideFrameTotal;
+    const revealFrames = Math.min(Math.round(timeline.FPS * 2.5), timeline.coverFrames);
+    const revealT = revealFrames > 0 ? ci / revealFrames : 1;
+    drawCoverCardOnCtx(octx, W, H, timeline.lastSlideFadeTo, timeline.coverLabel, revealT);
+  }
+
+  if (inOverlayPhase) {
+    const overallT = fi / Math.max(1, timeline.slideFrameTotal);
+    if (timeline.useLeak) drawLightLeakOnCtx(octx, W, H, overallT);
+    if (timeline.useDust) drawDustScratchesOnCtx(octx, W, H);
+  }
+
+  drawFrameBorderOnCtx(octx, W, H, timeline.frameStyle);
+  if (timeline.wmText) drawWatermarkOnCtx(octx, W, H, timeline.wmText);
+}
+
+function buildReel() {
+  // Use any graded photo — not just the active one
+  if (!photoQueue.some(p => p.gradedCanvas)) return;
+  buildReelBtn.disabled = true;
+
+  const timeline = buildTimeline();
+  if (!timeline) { buildReelBtn.disabled = false; return; }
+
+  const { FPS, totalFrames } = timeline;
+  const totalDurationSec = totalFrames / FPS;
+
+  const progressWrap = document.getElementById('progressWrap');
+  const fill = document.getElementById('progressFill');
+  const lbl = document.getElementById('progressLbl');
+  progressWrap.classList.add('show');
+  fill.style.width = '0%';
+
+  const fmt = document.querySelector('input[name="exportFormat"]:checked')?.value || 'mp4';
+
+  if (fmt === 'gif') {
+    buildReelGIF(timeline, totalDurationSec, progressWrap, fill, lbl);
+    return;
+  }
+
+  lbl.textContent = 'Starting encoder...';
+  const useVideoEncoder = typeof VideoEncoder !== 'undefined' && typeof Mp4Muxer !== 'undefined';
+  if (useVideoEncoder) {
+    buildReelMP4(timeline, totalDurationSec, progressWrap, fill, lbl).catch(err => {
+      lbl.textContent = 'MP4 failed, trying WebM... (' + err.message + ')';
+      buildReelWebM(timeline, totalDurationSec, progressWrap, fill, lbl);
+    });
+  } else {
+    buildReelWebM(timeline, totalDurationSec, progressWrap, fill, lbl);
+  }
+}
+
+async function buildReelMP4(timeline, totalDurationSec, progressWrap, fill, lbl) {
+  const { W, H, FPS, totalFrames } = timeline;
+
+  const muxer = new Mp4Muxer.Muxer({
+    target: new Mp4Muxer.ArrayBufferTarget(),
+    video: { codec: 'avc', width: W, height: H },
+    fastStart: 'in-memory'
+  });
+
+  let encoderError = null;
+  const encoder = new VideoEncoder({
+    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+    error: e => { encoderError = e; lbl.textContent = 'Encoder error: ' + e.message; }
+  });
+
+  encoder.configure({
+    codec: 'avc1.4D0028',
+    width: W, height: H,
+    bitrate: 10_000_000,
+    framerate: FPS
+  });
+
+  const offscreen = document.createElement('canvas');
+  offscreen.width = W; offscreen.height = H;
+  const octx = offscreen.getContext('2d');
+
+  for (let fi = 0; fi < totalFrames; fi++) {
+    if (encoderError) throw encoderError;
+    renderFrame(octx, timeline, fi);
+    const timestampUs = Math.round((fi / FPS) * 1_000_000);
+    const durationUs  = Math.round((1 / FPS) * 1_000_000);
+    const frame = new VideoFrame(offscreen, { timestamp: timestampUs, duration: durationUs });
+    encoder.encode(frame, { keyFrame: fi % (FPS * 2) === 0 });
+    frame.close();
+    fill.style.width = Math.round((fi / totalFrames) * 100) + '%';
+    lbl.textContent = `Encoding frame ${fi + 1}/${totalFrames}`;
+    if (fi % 10 === 0) await new Promise(r => setTimeout(r, 0));
+  }
+
+  await encoder.flush();
+  if (encoderError) throw encoderError;
+  muxer.finalize();
+
+  const { buffer } = muxer.target;
+  const blob = new Blob([buffer], { type: 'video/mp4' });
+  progressWrap.classList.remove('show');
+  deliverOutput(blob, 'mp4', totalDurationSec, timeline);
+}
+
+function buildReelWebM(timeline, totalDurationSec, progressWrap, fill, lbl) {
+  const { W, H, FPS, totalFrames } = timeline;
+
+  try {
+  const outCanvas = document.createElement('canvas');
+  outCanvas.width = W; outCanvas.height = H;
+  const octx = outCanvas.getContext('2d');
+
+  const mimeType = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm']
+    .find(m => MediaRecorder.isTypeSupported(m)) || 'video/webm';
+
+  const chunks = [];
+  const stream = outCanvas.captureStream(FPS);
+  const rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 10_000_000 });
+  rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+  rec.start(100);
+
+  let fi = 0;
+  function drawFrame() {
+    if (fi >= totalFrames) { rec.stop(); return; }
+    renderFrame(octx, timeline, fi);
+    fill.style.width = Math.round((fi / totalFrames) * 100) + '%';
+    lbl.textContent = `Rendering frame ${fi + 1}/${totalFrames}`;
+    fi++;
+    setTimeout(drawFrame, 1000 / FPS);
+  }
+
+  rec.onstop = async () => {
+    progressWrap.classList.remove('show');
+    lbl.textContent = 'Fixing duration...';
+    progressWrap.classList.add('show');
+
+    let blob = new Blob(chunks, { type: mimeType });
+
+    // Patch WebM duration metadata
+    try {
+      const buf = await blob.arrayBuffer();
+      const arr = new Uint8Array(buf);
+      const dv = new DataView(buf);
+      for (let i = 0; i < arr.length - 12; i++) {
+        if (arr[i] === 0x44 && arr[i+1] === 0x89) {
+          const sz = arr[i+2];
+          if (sz === 0x88) { dv.setFloat64(i+3, totalDurationSec * 1000, false); break; }
+          if (sz === 0x84) { dv.setFloat32(i+3, totalDurationSec * 1000, false); break; }
+        }
+      }
+      blob = new Blob([buf], { type: mimeType });
+    } catch(e) {}
+
+    progressWrap.classList.remove('show');
+    deliverOutput(blob, 'webm', totalDurationSec, timeline);
+  };
+
+  drawFrame();
+  } catch(err) {
+    progressWrap.classList.remove('show');
+    buildReelBtn.disabled = false;
+    const wrap = document.getElementById('outputWrap');
+    wrap.classList.add('show');
+    wrap.innerHTML = `<p style="color:#c0392b;font-size:12px;padding:10px;background:#fde8e8;border-radius:8px">Build failed: ${err.message}</p>`;
+  }
+}
+
+function deliverOutput(blob, ext, totalDurationSec, timeline) {
+  const url = URL.createObjectURL(blob);
+  const fn = `fuji-reel-${document.getElementById('recipe').value}-${Math.round(totalDurationSec)}s.${ext}`;
+  const wrap = document.getElementById('outputWrap');
+  wrap.classList.add('show');
+  wrap.innerHTML = `
+    <video class="preview-video" src="${url}" controls></video>
+    <a class="dl-link" href="${url}" download="${fn}">
+      Download ${ext.toUpperCase()} · 1080×1920 · ${totalDurationSec.toFixed(1)}s
+    </a>
+    ${ext === 'webm' ? '<p class="note">WebM exported — if Instagram rejects it, convert to MP4 at cloudconvert.com</p>' : ''}
+  `;
+  buildReelBtn.disabled = false;
+  renderMusicMarkers(timeline);
+}
+async function buildReelGIF(timeline, totalDurationSec, progressWrap, fill, lbl) {
+  if (typeof GIF === 'undefined') {
+    lbl.textContent = 'GIF library not loaded — internet required for first use.';
+    setTimeout(() => { progressWrap.classList.remove('show'); buildReelBtn.disabled = false; }, 3000);
+    return;
+  }
+
+  // GIF at half-res, 10fps — good quality/size balance for Reddit
+  const GIF_W = 540, GIF_H = 960;
+  const GIF_FPS = 10;
+  const DELAY = Math.round(1000 / GIF_FPS); // milliseconds per frame
+  const GIF_FRAMES = Math.round(totalDurationSec * GIF_FPS);
+  const scale = GIF_W / timeline.W;
+
+  // Fetch GIF worker as blob to avoid CORS issues with local HTML files
+  let workerURL;
+  try {
+    lbl.textContent = 'Loading GIF encoder worker...';
+    const resp = await fetch('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js');
+    const text = await resp.text();
+    workerURL = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+  } catch(e) {
+    lbl.textContent = 'GIF worker fetch failed — check internet connection.';
+    setTimeout(() => { progressWrap.classList.remove('show'); buildReelBtn.disabled = false; }, 3000);
+    return;
+  }
+
+  const gif = new GIF({
+    workers: 2,
+    quality: 6,         // 1=best, 30=worst — 6 is high quality
+    dither: 'FloydSteinberg',
+    width: GIF_W,
+    height: GIF_H,
+    workerScript: workerURL
+  });
+
+  const offscreen = document.createElement('canvas');
+  offscreen.width = GIF_W; offscreen.height = GIF_H;
+  const octx = offscreen.getContext('2d');
+
+  for (let fi = 0; fi < GIF_FRAMES; fi++) {
+    const reelFi = Math.round((fi / GIF_FRAMES) * (timeline.totalFrames - 1));
+    octx.save();
+    octx.scale(scale, scale);
+    renderFrame(octx, timeline, reelFi);
+    octx.restore();
+    gif.addFrame(offscreen, { copy: true, delay: DELAY });
+
+    fill.style.width = Math.round((fi / GIF_FRAMES) * 70) + '%';
+    lbl.textContent = `GIF: rendering frame ${fi + 1}/${GIF_FRAMES}`;
+    if (fi % 5 === 0) await new Promise(r => setTimeout(r, 0));
+  }
+
+  lbl.textContent = 'Encoding GIF palette + compression (may take 30-60s)...';
+
+  gif.on('progress', p => {
+    fill.style.width = (70 + Math.round(p * 30)) + '%';
+  });
+
+  gif.on('finished', blob => {
+    URL.revokeObjectURL(workerURL);
+    progressWrap.classList.remove('show');
+    deliverOutput(blob, 'gif', totalDurationSec, timeline);
+    buildReelBtn.disabled = false;
+  });
+
+  gif.render();
+}
+
+buildReelBtn.addEventListener('click', buildReel);
+
+document.getElementById('coverLabel').addEventListener('input', () => {
+  const active = getActive();
+  if (active?.gradedCanvas && document.getElementById('coverLabel').value.trim()) {
+    renderCoverStill();
+  } else {
+    document.getElementById('coverCard').style.display = 'none';
+  }
+  updateTotalDuration();
+  updateScrubAvailability();
+});
+
+document.getElementById('surpriseBtn').addEventListener('click', () => {
+  const recipes = ['portra400', 'gold200', 'trix400'];
+  const pans = ['none', 'lr', 'rl', 'tb', 'bt'];
+  const frames = ['none', 'white', 'black', 'rebate', 'sprocket', 'polaroid', 'instax', 'vignette'];
+
+  setRecipe(recipes[Math.floor(Math.random() * recipes.length)]);
+  document.getElementById('strength').value = 70 + Math.floor(Math.random() * 30);
+  document.getElementById('strengthVal').textContent = document.getElementById('strength').value + '%';
+  document.getElementById('grain').value = 15 + Math.floor(Math.random() * 50);
+  document.getElementById('grainVal').textContent = document.getElementById('grain').value;
+  document.getElementById('panDirection').value = pans[Math.floor(Math.random() * pans.length)];
+  document.getElementById('frameStyle').value = frames[Math.floor(Math.random() * frames.length)];
+  document.getElementById('zoomAmt').value = 8 + Math.floor(Math.random() * 28);
+  document.getElementById('zoomVal').textContent = document.getElementById('zoomAmt').value + '%';
+  document.getElementById('dustToggle').checked = Math.random() > 0.3;
+  document.getElementById('leakToggle').checked = Math.random() > 0.4;
+
+  if (photoQueue.length) applyRecipe();
+});
+
+function fmtTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = (sec % 60).toFixed(1);
+  return `${m}:${s.padStart(4, '0')}`;
+}
+
+function renderMusicMarkers(timeline) {
+  const marks = [];
+  let cursor = 0;
+  marks.push([0, 'Reel starts']);
+  timeline.slides.forEach((slide, i) => {
+    const transSec = slide.transitionFrames / timeline.FPS;
+    const zoomSec = slide.zoomFrames / timeline.FPS;
+    cursor += transSec;
+    marks.push([cursor, i === 0 ? 'Transition complete — zoom begins' : 'Slide transition complete — zoom begins']);
+    marks.push([cursor + zoomSec * 0.5, 'Midpoint of zoom — good spot for a beat or lyric hit']);
+    cursor += zoomSec;
+    marks.push([cursor, timeline.useCover || i < timeline.slides.length - 1 ? 'Zoom ends' : 'Zoom ends — reel ends']);
+  });
+  if (timeline.useCover) {
+    const coverSec = timeline.coverFrames / timeline.FPS;
+    marks.push([cursor + coverSec, 'Cover card ends — reel ends']);
+  }
+
+  const list = document.getElementById('markersList');
+  list.innerHTML = marks.map(([t, label]) => `<div>${fmtTime(t)} — ${label}</div>`).join('');
+  document.getElementById('markersWrap').style.display = 'block';
+
+  if (document.getElementById('coverLabel').value.trim()) renderCoverStill();
+}
+
+// ==================== Scrub preview ====================
+const scrubWrap = document.getElementById('scrubWrap');
+const scrubLabel = document.getElementById('scrubLabel');
+const scrubBar = document.getElementById('scrubBar');
+const scrubVal = document.getElementById('scrubVal');
+const scrubCanvas = document.getElementById('scrubCanvas');
+const scrubCtx = scrubCanvas.getContext('2d');
+
+let currentTimeline = null;
+
+function updateScrubAvailability() {
+  currentTimeline = buildTimeline();
+  if (!currentTimeline) {
+    scrubWrap.style.display = 'none';
+    scrubLabel.style.display = 'none';
+    scrubBar.style.display = 'none';
+    return;
+  }
+  scrubWrap.style.display = 'block';
+  scrubLabel.style.display = 'block';
+  scrubBar.style.display = 'block';
+  scrubBar.value = 0; // always start at frame 0 so user sees the clean opening
+  scrubCanvas.width = Math.round(currentTimeline.W / 2);
+  scrubCanvas.height = Math.round(currentTimeline.H / 2);
+  renderScrubAtSliderValue();
+}
+
+function renderScrubAtSliderValue() {
+  if (!currentTimeline) return;
+  const frac = parseInt(scrubBar.value) / 1000;
+  const fi = Math.min(currentTimeline.totalFrames - 1, Math.round(frac * (currentTimeline.totalFrames - 1)));
+  try {
+    // Scale down to half-res for scrub by scaling the context
+    const scale = 0.5;
+    scrubCtx.save();
+    scrubCtx.scale(scale, scale);
+    renderFrame(scrubCtx, currentTimeline, fi);
+    scrubCtx.restore();
+    scrubVal.textContent = fmtTime(fi / currentTimeline.FPS);
+    // Clear any previous error message
+    let errEl = document.getElementById('scrubError');
+    if (errEl) errEl.remove();
+  } catch(err) {
+    scrubCtx.restore();
+    let errEl = document.getElementById('scrubError');
+    if (!errEl) {
+      errEl = document.createElement('p');
+      errEl.id = 'scrubError';
+      errEl.style.cssText = 'font-size:11px;color:#c0392b;margin-top:6px;background:#fde8e8;padding:6px 10px;border-radius:6px;';
+      scrubWrap.parentNode.insertBefore(errEl, scrubWrap.nextSibling);
+    }
+    errEl.textContent = 'Preview error: ' + err.message;
+  }
+}
+
+scrubBar.addEventListener('input', renderScrubAtSliderValue);
+
+
+function renderCoverStill() {
+  const gradedCanvas = getActive()?.gradedCanvas; if (!gradedCanvas) return;
+  const W = 1080, H = 1920;
+  const cc = document.getElementById('coverCanvas');
+  cc.width = W; cc.height = H;
+  const cctx = cc.getContext('2d');
+
+  const src = gradedCanvas;
+
+  const ia = src.width / src.height, ca = W / H;
+  let dw, dh;
+  if (ia > ca) { dh = H; dw = H * ia; } else { dw = W; dh = W / ia; }
+  const dx = (W - dw) / 2, dy = (H - dh) / 2;
+
+  cctx.fillStyle = '#0a0a0a';
+  cctx.fillRect(0, 0, W, H);
+  cctx.save();
+  cctx.globalAlpha = 0.92;
+  cctx.drawImage(src, dx, dy, dw, dh);
+  cctx.fillStyle = 'rgba(0,0,0,0.55)';
+  cctx.fillRect(0, 0, W, H);
+  cctx.restore();
+
+  const coverLabel = document.getElementById('coverLabel').value.trim();
+
+  const font = '300 64px Georgia, serif';
+  cctx.font = font;
+  const maxWidth = W * 0.82;
+  const words = coverLabel.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (cctx.measureText(test).width > maxWidth && line) { lines.push(line); line = w; }
+    else { line = test; }
+  }
+  if (line) lines.push(line);
+
+  const lineHeight = 74;
+  const startY = H * 0.667 - (lines.length - 1) * lineHeight / 2;
+  cctx.textAlign = 'center';
+  cctx.fillStyle = '#e8e8e8';
+  lines.forEach((l, i) => cctx.fillText(l, W / 2, startY + i * lineHeight));
+
+  document.getElementById('coverCard').style.display = 'block';
+  cc.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const dl = document.getElementById('coverDl');
+    dl.href = url;
+    dl.download = `film-memory-cover-${Date.now()}.jpg`;
+  }, 'image/jpeg', 0.94);
+}
+// ==================== Diagnostics ====================
+document.getElementById('diagToggle').addEventListener('click', () => {
+  const body = document.getElementById('diagBody');
+  body.style.display = body.style.display === 'none' ? 'block' : 'none';
+});
+
+document.getElementById('runDiagBtn').addEventListener('click', runDiagnostics);
+
+async function runDiagnostics() {
+  const out = document.getElementById('diagResults');
+  out.innerHTML = '<div style="color:#a8967c;font-size:11px;padding:4px 0">Running…</div>';
+  const results = [];
+  function pass(label) { results.push({ ok: true, label }); }
+  function fail(label, reason) { results.push({ ok: false, label, reason }); }
+
+  // ── 1. DOM: all required elements present ────────────────────────────────
+  const requiredIds = [
+    'fileInput','dropZone','canvas','recipe','strength','grain',
+    'applyBtn','exportJpgBtn','buildReelBtn','surpriseBtn',
+    'duration','zoomAmt','panDirection','fitMode','frameStyle',
+    'dustToggle','leakToggle','coverLabel','wmToggle','wmText',
+    'scrubBar','scrubCanvas','progressWrap','outputWrap',
+    'coverCard','coverCanvas','markersWrap',
+    'recipePickerBtn','recipeModalOverlay','photoQueue'
+  ];
+  const missing = requiredIds.filter(id => !document.getElementById(id));
+  if (missing.length === 0) pass(`DOM — all ${requiredIds.length} elements present`);
+  else fail('DOM — missing elements', missing.join(', '));
+
+  // ── 2. Recipe select has correct options (not old kodachrome64/arizona) ──
+  try {
+    const sel = document.getElementById('recipe');
+    const vals = Array.from(sel.options).map(o => o.value);
+    const expected = ['portra400','gold200','trix400'];
+    const old = vals.filter(v => !expected.includes(v));
+    const absent = expected.filter(v => !vals.includes(v));
+    if (old.length === 0 && absent.length === 0)
+      pass(`Recipe select — correct 3 options: ${vals.join(', ')}`);
+    else
+      fail('Recipe select', `Old options: [${old}] Missing: [${absent}]`);
+    // Default value must be portra400
+    if (sel.value === 'portra400') pass('Recipe default — portra400 ✓');
+    else fail('Recipe default', `Is "${sel.value}", should be "portra400"`);
+  } catch(e) { fail('Recipe select check', e.message); }
+
+  // ── 3. LUT engine: all 3 recipes callable and in range ───────────────────
+  for (const key of ['portra400','gold200','trix400']) {
+    try {
+      const fn = RECIPES[key];
+      if (typeof fn !== 'function') { fail(`LUT ${key}`, 'not a function'); continue; }
+      const [r,g,b] = fn(180,130,100); // skin tone
+      if (!Number.isFinite(r)||!Number.isFinite(g)||!Number.isFinite(b))
+        fail(`LUT ${key}`, `non-finite: ${r},${g},${b}`);
+      else if (r<0||r>255||g<0||g>255||b<0||b>255)
+        fail(`LUT ${key}`, `out of range: ${Math.round(r)},${Math.round(g)},${Math.round(b)}`);
+      else
+        pass(`LUT ${key} — skin (180,130,100)→(${Math.round(r)},${Math.round(g)},${Math.round(b)})`);
+    } catch(e) { fail(`LUT ${key}`, e.message); }
+  }
+
+  // ── 4. Gold 200 is distinctly warmer than Portra (key character check) ───
+  try {
+    const [pr,,,] = RECIPES.portra400(128,128,128);
+    const [gr,,,] = RECIPES.gold200(128,128,128);
+    // Gold 200 neutral gray should have higher R than Portra
+    if (gr >= pr) pass(`Gold 200 warmer than Portra on neutral (G:${Math.round(gr)} ≥ P:${Math.round(pr)})`);
+    else fail('Gold 200 warmth', `Neutral R: Gold=${Math.round(gr)} Portra=${Math.round(pr)} — Gold should be warmer`);
+  } catch(e) { fail('Gold 200 character check', e.message); }
+
+  // ── 5. Tri-X is B&W (desaturated) ───────────────────────────────────────
+  try {
+    const [r,g,b] = RECIPES.trix400(180,130,100);
+    const diff = Math.max(Math.abs(r-g),Math.abs(g-b),Math.abs(r-b));
+    if (diff < 15) pass(`Tri-X B&W — desaturated (Δ=${diff.toFixed(1)})`);
+    else fail('Tri-X B&W', `Still has color cast Δ=${diff.toFixed(1)} (expect <15)`);
+  } catch(e) { fail('Tri-X B&W check', e.message); }
+
+  // ── 6. gradeImageData: full pixel pipeline on real canvas ────────────────
+  try {
+    const src = document.createElement('canvas'); src.width=8; src.height=8;
+    const sctx = src.getContext('2d');
+    sctx.fillStyle='rgb(180,130,100)'; sctx.fillRect(0,0,8,8);
+    sctx.fillStyle='rgb(30,30,30)'; sctx.fillRect(4,4,4,4);
+    document.getElementById('recipe').value = 'portra400';
+    const graded = gradeImageData(src);
+    if (!(graded instanceof HTMLCanvasElement)) throw new Error('did not return canvas');
+    if (graded.width !== 8 || graded.height !== 8) throw new Error(`wrong size: ${graded.width}x${graded.height}`);
+    const px = graded.getContext('2d').getImageData(0,0,1,1).data;
+    const orig = sctx.getImageData(0,0,1,1).data;
+    const changed = px[0]!==orig[0]||px[1]!==orig[1]||px[2]!==orig[2];
+    if (changed) pass(`gradeImageData — Portra transforms (180,130,100)→(${px[0]},${px[1]},${px[2]})`);
+    else fail('gradeImageData', 'output pixel identical to input — recipe not applying');
+  } catch(e) { fail('gradeImageData', e.message); }
+
+  // ── 7. Gold 200 via gradeImageData ──────────────────────────────────────
+  try {
+    const src = document.createElement('canvas'); src.width=4; src.height=4;
+    src.getContext('2d').fillStyle='rgb(180,130,100)'; src.getContext('2d').fillRect(0,0,4,4);
+    document.getElementById('recipe').value = 'gold200';
+    const graded = gradeImageData(src);
+    const px = graded.getContext('2d').getImageData(0,0,1,1).data;
+    pass(`gradeImageData Gold 200 — skin→(${px[0]},${px[1]},${px[2]})`);
+    document.getElementById('recipe').value = 'portra400'; // reset
+  } catch(e) { fail('gradeImageData Gold 200', e.message); }
+
+  // ── 8. buildTimeline — with mock graded photo ────────────────────────────
+  let testTimeline = null;
+  try {
+    const savedQueue = photoQueue.slice();
+    const savedActive = activePhotoId;
+    const fakeC = document.createElement('canvas'); fakeC.width=4; fakeC.height=4;
+    fakeC.getContext('2d').fillStyle='rgb(100,80,60)'; fakeC.getContext('2d').fillRect(0,0,4,4);
+    const graded = gradeImageData(fakeC);
+    const fakeId = -9999;
+    photoQueue = [{ id: fakeId, baseCanvas: fakeC, gradedCanvas: graded,
+      anchor: { xPct:0.5, yPct:0.32 }, thumbDataUrl:'' }];
+    activePhotoId = fakeId;
+    testTimeline = buildTimeline();
+    photoQueue = savedQueue;
+    activePhotoId = savedActive;
+    if (testTimeline && testTimeline.totalFrames > 0 && testTimeline.slides?.length > 0)
+      pass(`buildTimeline — ${testTimeline.totalFrames} frames, fitMode="${testTimeline.fitMode}"`);
+    else
+      fail('buildTimeline', testTimeline ? `frames=${testTimeline.totalFrames}` : 'returned null');
+  } catch(e) {
+    try { photoQueue = []; activePhotoId = null; } catch(_) {}
+    fail('buildTimeline', e.message);
+  }
+
+  // ── 9. renderFrame — cover, fill modes, transition, zoom ─────────────────
+  if (testTimeline) {
+    try {
+      const tc = document.createElement('canvas');
+      tc.width = testTimeline.W; tc.height = testTimeline.H;
+      const tctx = tc.getContext('2d');
+      // Test frame 0 (zoom start), and last frame
+      renderFrame(tctx, testTimeline, 0);
+      renderFrame(tctx, testTimeline, Math.floor(testTimeline.totalFrames/2));
+      renderFrame(tctx, testTimeline, testTimeline.totalFrames - 1);
+      pass('renderFrame — 3 frames (start/mid/end) rendered without error');
+    } catch(e) { fail('renderFrame', e.message); }
+
+    // Test contain-fit mode
+    try {
+      const containTL = { ...testTimeline, fitMode: 'contain' };
+      const tc2 = document.createElement('canvas');
+      tc2.width = testTimeline.W; tc2.height = testTimeline.H;
+      renderFrame(tc2.getContext('2d'), containTL, 0);
+      pass('renderFrame contain-fit — rendered without error');
+    } catch(e) { fail('renderFrame contain-fit', e.message); }
+
+    // Test watermark
+    try {
+      const wmTL = { ...testTimeline, wmText: '@testhandle' };
+      const tc3 = document.createElement('canvas');
+      tc3.width = testTimeline.W; tc3.height = testTimeline.H;
+      renderFrame(tc3.getContext('2d'), wmTL, 0);
+      pass('renderFrame watermark — rendered without error');
+    } catch(e) { fail('renderFrame watermark', e.message); }
+  } else {
+    fail('renderFrame', 'skipped — buildTimeline failed');
+  }
+
+  // ── 10. Frame borders ───────────────────────────────────────────────────
+  try {
+    const tc = document.createElement('canvas'); tc.width=64; tc.height=64;
+    const tctx = tc.getContext('2d');
+    for (const s of ['none','white','black','rebate','sprocket','polaroid','instax','vignette'])
+      drawFrameBorderOnCtx(tctx, 64, 64, s);
+    pass('Frame borders — all 8 styles rendered without error');
+  } catch(e) { fail('Frame borders', e.message); }
+
+  // ── 11. Watermark draw function ─────────────────────────────────────────
+  try {
+    const tc = document.createElement('canvas'); tc.width=1080; tc.height=1920;
+    drawWatermarkOnCtx(tc.getContext('2d'), 1080, 1920, '@bangkokphoto');
+    pass('drawWatermarkOnCtx — rendered without error');
+  } catch(e) { fail('drawWatermarkOnCtx', e.message); }
+
+  // ── 12. drawImageOnCtx — both modes ────────────────────────────────────
+  try {
+    const src = document.createElement('canvas'); src.width=100; src.height=133;
+    src.getContext('2d').fillStyle='#888'; src.getContext('2d').fillRect(0,0,100,133);
+    const tc = document.createElement('canvas'); tc.width=1080; tc.height=1920;
+    drawImageOnCtx(tc.getContext('2d'), src, 1080, 1920, 'cover');
+    drawImageOnCtx(tc.getContext('2d'), src, 1080, 1920, 'contain');
+    pass('drawImageOnCtx — cover and contain both work');
+  } catch(e) { fail('drawImageOnCtx', e.message); }
+
+  // ── 13. VideoEncoder + Mp4Muxer availability ────────────────────────────
+  try {
+    const hasVE = typeof VideoEncoder !== 'undefined';
+    const hasMux = typeof Mp4Muxer !== 'undefined';
+    if (hasVE && hasMux) pass('VideoEncoder + Mp4Muxer — MP4 export ready');
+    else if (!hasVE && !hasMux) fail('MP4 encoder', 'VideoEncoder and Mp4Muxer both unavailable — WebM fallback only');
+    else fail('MP4 encoder', `VideoEncoder=${hasVE}, Mp4Muxer=${hasMux}`);
+  } catch(e) { fail('MP4 encoder check', e.message); }
+
+  // ── 14. Build button state logic ────────────────────────────────────────
+  try {
+    const btn = document.getElementById('buildReelBtn');
+    const wasDisabled = btn.disabled;
+    // Simulate: if we have graded photos, button should be enabled
+    const hasGraded = photoQueue.some(p => p.gradedCanvas);
+    const expectEnabled = hasGraded;
+    if (expectEnabled === !btn.disabled || (!hasGraded && btn.disabled))
+      pass(`Build button state — ${btn.disabled ? 'disabled' : 'enabled'} (${hasGraded ? 'has graded' : 'no graded'} photos)`);
+    else
+      fail('Build button state', `disabled=${btn.disabled}, hasGraded=${hasGraded} — mismatch`);
+  } catch(e) { fail('Build button state', e.message); }
+
+  // ── 15. MediaRecorder fallback ──────────────────────────────────────────
+  try {
+    const types = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+    const supported = types.filter(t => MediaRecorder.isTypeSupported(t));
+    if (supported.length > 0) pass(`MediaRecorder fallback — ${supported[0]}`);
+    else fail('MediaRecorder', 'no WebM codec supported — WebM fallback unavailable');
+  } catch(e) { fail('MediaRecorder', e.message); }
+
+  // ── 16. canvas.toBlob ──────────────────────────────────────────────────
+  await new Promise(resolve => {
+    try {
+      const tc = document.createElement('canvas'); tc.width=4; tc.height=4;
+      tc.toBlob(blob => {
+        if (blob && blob.size > 0) pass('canvas.toBlob — works (JPG export functional)');
+        else fail('canvas.toBlob', 'blob empty');
+        resolve();
+      }, 'image/jpeg', 0.9);
+    } catch(e) { fail('canvas.toBlob', e.message); resolve(); }
+  });
+
+  // ── Render results ───────────────────────────────────────────────────────
+  const passed = results.filter(r => r.ok).length;
+  const failed_n = results.filter(r => !r.ok).length;
+  out.innerHTML = results.map(r => `
+    <div style="display:flex;align-items:flex-start;gap:8px;padding:3px 0;border-bottom:1px solid #f0ebe3">
+      <span style="color:${r.ok?'#2e8c5a':'#c0392b'};flex-shrink:0;font-weight:700;font-size:13px">${r.ok?'✓':'✗'}</span>
+      <span style="color:${r.ok?'#3d2e1a':'#c0392b'};font-size:11px">${r.label}${r.reason?`<br><span style="font-size:10px;opacity:0.75">${r.reason}</span>`:''}</span>
+    </div>
+  `).join('') + `
+    <div style="margin-top:12px;padding:8px 10px;border-radius:6px;font-size:12px;font-weight:700;
+      background:${failed_n===0?'#e8f4ee':'#fde8e8'};color:${failed_n===0?'#2e8c5a':'#c0392b'}">
+      ${passed}/${results.length} passed${failed_n>0?` — ${failed_n} failed — see ✗ above`:' — all systems go'}
+    </div>
+  `;
+}
+
+</script>
+</body>
+</html>
