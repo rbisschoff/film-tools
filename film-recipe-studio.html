@@ -2,61 +2,212 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Fuji Film Recipe Studio</title>
 <script src="https://cdn.jsdelivr.net/npm/mp4-muxer@4.3.3/build/mp4-muxer.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  :root {
+    --accent: #007AFF;
+    --accent-dark: #0051D5;
+    --accent-light: rgba(0, 122, 255, 0.12);
+    --positive: #34C759;
+    --alert: #FF3B30;
+    --ink: #1C1C1E;
+    --ink2: #3A3A3C;
+    --muted: #8E8E93;
+    --muted2: #AEAEB2;
+    --bg: #F2F2F7;
+    --card: #FFFFFF;
+    --card2: #F9F9FB;
+    --border: rgba(60, 60, 67, 0.12);
+    --radius-lg: 20px;
+    --radius-md: 16px;
+    --radius-sm: 12px;
+    --shadow-card: 0 2px 16px rgba(0,0,0,0.06);
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #f5f0ea; color: #2a2118; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; min-height: 100vh; padding: 20px 16px 60px; }
-  h1 { font-size: 12px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: #a8967c; margin-bottom: 24px; }
-  h1 span { color: #2a2118; }
-  .card { background: #fdfaf6; border: 1px solid #e8e0d4; border-radius: 12px; padding: 18px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(60,40,10,0.06); }
-  .card-title { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #b0987a; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-  .step-num { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #e8f4ee; color: #2e8c5a; font-size: 9px; font-weight: 700; flex-shrink: 0; }
-  .hint { font-size: 11px; color: #8a7560; line-height: 1.6; margin-bottom: 12px; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: -apple-system, 'Inter', BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: clip;
+    padding: 0;
+  }
+  header {
+    background: rgba(8,8,14,0.96);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .header-inner {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 10px 16px;
+    padding-top: calc(10px + env(safe-area-inset-top));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .brand-mark {
+    width: 30px; height: 30px; background: var(--accent); border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 13px; flex-shrink: 0;
+    box-shadow: 0 2px 10px rgba(0, 122, 255, 0.35);
+  }
+  .brand-text { min-width: 0; }
+  .brand-title { color: #fff; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .brand-sub { color: rgba(255,255,255,0.4); font-size: 11px; margin-top: 1px; }
+  .header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .header-link {
+    color: #fff; font-size: 12px; font-weight: 500;
+    padding: 8px 10px; border-radius: 8px; min-height: 36px;
+    display: inline-flex; align-items: center;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+    text-decoration: none;
+  }
 
-  .drop-zone { border: 1.5px dashed #d4c8b8; border-radius: 8px; padding: 28px 16px; text-align: center; cursor: pointer; transition: border-color 0.2s; position: relative; background: #faf6f0; }
-  .drop-zone:hover, .drop-zone.drag-over { border-color: #2e8c5a; }
+  .wrap {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 16px 16px calc(48px + env(safe-area-inset-bottom));
+  }
+
+  .card {
+    background: var(--card);
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 18px 16px;
+    margin-bottom: 12px;
+    box-shadow: var(--shadow-card);
+  }
+  .card-title {
+    font-size: 13px; font-weight: 700; letter-spacing: -0.01em;
+    color: var(--ink); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .step-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--accent-light); color: var(--accent);
+    font-size: 11px; font-weight: 700; flex-shrink: 0;
+  }
+  .hint { font-size: 13px; color: var(--muted); line-height: 1.55; margin-bottom: 12px; }
+
+  .drop-zone {
+    border: 1.5px dashed var(--border); border-radius: var(--radius-sm);
+    padding: 28px 16px; text-align: center; cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative; background: var(--card2); min-height: 100px;
+  }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: var(--accent-light); }
   .drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
   .drop-icon { font-size: 24px; margin-bottom: 6px; }
-  .drop-label { font-size: 12px; color: #b0987a; }
-  .drop-label strong { color: #5c4a32; }
+  .drop-label { font-size: 13px; color: var(--muted); }
+  .drop-label strong { color: var(--ink2); }
 
-  select, input[type=range] { width: 100%; background: #faf6f0; border: 1px solid #d4c8b8; border-radius: 6px; color: #2a2118; font-size: 12px; padding: 8px 10px; outline: none; appearance: none; -webkit-appearance: none; }
-  input[type=text] { width: 100%; background: #faf6f0; border: 1px solid #d4c8b8; border-radius: 6px; color: #2a2118; font-size: 12px; padding: 8px 10px; outline: none; }
-  input[type=text]::placeholder { color: #b0987a; }
-  .opt-label { font-size: 10px; color: #a8967c; margin: 10px 0 5px; letter-spacing: 0.08em; text-transform: uppercase; display: block; }
-  .row-val { font-size: 11px; color: #2e8c5a; font-weight: 600; }
+  select, input[type=range], input[type=text] {
+    width: 100%; background: var(--card2); border: 1px solid var(--border);
+    border-radius: 10px; color: var(--ink); font-size: 16px;
+    padding: 12px 12px; outline: none; appearance: none; -webkit-appearance: none;
+    font-family: inherit; min-height: 44px;
+  }
+  input[type=range] { padding: 0; min-height: 32px; background: transparent; border: none; }
+  input[type=text]::placeholder { color: var(--muted2); }
+  .opt-label {
+    font-size: 11px; color: var(--muted); margin: 12px 0 6px;
+    letter-spacing: 0.06em; text-transform: uppercase; display: block; font-weight: 600;
+  }
+  .row-val { font-size: 12px; color: var(--accent); font-weight: 600; }
 
-  .btn { width: 100%; padding: 12px; border-radius: 8px; border: none; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: opacity 0.2s; margin-top: 8px; }
-  .btn:disabled { opacity: 0.3; cursor: not-allowed; }
-  .btn-green { background: #2e8c5a; color: #fff; padding: 14px; font-size: 13px; }
-  .btn-green:not(:disabled):hover { opacity: 0.85; }
-  .btn-outline { background: #faf6f0; border: 1px solid #d4c8b8; color: #6b5540; }
-  .btn-outline:not(:disabled):hover { border-color: #a8967c; color: #2a2118; }
+  .btn {
+    width: 100%; padding: 14px; border-radius: var(--radius-sm); border: none;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.02em;
+    cursor: pointer; transition: background 0.15s, opacity 0.2s; margin-top: 8px;
+    font-family: inherit; min-height: 48px; -webkit-tap-highlight-color: transparent;
+  }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-green { background: var(--accent); color: #fff; }
+  .btn-green:not(:disabled):hover { background: var(--accent-dark); }
+  .btn-outline { background: var(--card2); border: 1px solid var(--border); color: var(--ink2); }
+  .btn-outline:not(:disabled):hover { border-color: var(--accent); color: var(--accent); }
 
   .canvas-wrap { position: relative; margin-top: 12px; display: none; }
   .canvas-wrap.show { display: block; }
-  canvas { width: 100%; border-radius: 8px; display: block; background: #e8e0d4; cursor: crosshair; }
-  .anchor-dot { position: absolute; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #2e8c5a; background: rgba(46,140,90,0.2); transform: translate(-50%,-50%); pointer-events: none; }
-  .note { font-size: 10px; color: #b0987a; margin-top: 8px; line-height: 1.5; }
+  canvas { width: 100%; border-radius: var(--radius-sm); display: block; background: #E5E5EA; cursor: crosshair; }
+  .anchor-dot {
+    position: absolute; width: 16px; height: 16px; border-radius: 50%;
+    border: 2px solid var(--accent); background: rgba(0,122,255,0.2);
+    transform: translate(-50%,-50%); pointer-events: none;
+  }
+  .note { font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
 
   .progress-wrap { display: none; margin-top: 12px; }
   .progress-wrap.show { display: block; }
-  .progress-bg { background: #e8e0d4; border-radius: 3px; height: 3px; overflow: hidden; margin-bottom: 6px; }
-  .progress-fill { height: 100%; background: #2e8c5a; border-radius: 3px; transition: width 0.2s; width: 0%; }
-  .progress-lbl { font-size: 10px; color: #a8967c; }
+  .progress-bg { background: rgba(0,0,0,0.08); border-radius: 3px; height: 4px; overflow: hidden; margin-bottom: 6px; }
+  .progress-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.2s; width: 0%; }
+  .progress-lbl { font-size: 12px; color: var(--muted); }
 
   .output-wrap { display: none; margin-top: 14px; }
   .output-wrap.show { display: block; }
-  .preview-video { width: 100%; border-radius: 8px; max-height: 420px; object-fit: contain; background: #2a2118; display: block; }
-  .dl-link { display: block; text-align: center; margin-top: 10px; text-decoration: none; padding: 13px; border-radius: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; background: #2e8c5a; color: #fff; }
+  .preview-video { width: 100%; border-radius: var(--radius-sm); max-height: 420px; object-fit: contain; background: #1C1C1E; display: block; }
+  .dl-link {
+    display: block; text-align: center; margin-top: 10px; text-decoration: none;
+    padding: 14px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 700;
+    background: var(--accent); color: #fff; min-height: 48px;
+  }
+
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 0; border-bottom: 1px solid var(--border); gap: 12px;
+  }
+  .toggle-row span { font-size: 14px; color: var(--ink2); }
+  input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); }
+
+  #recipeModalOverlay { align-items: flex-end; justify-content: center; }
+  #recipeModalList {
+    background: var(--card) !important;
+    border-radius: 20px 20px 0 0 !important;
+    width: 100%; max-width: 600px; overflow: hidden;
+    max-height: min(80vh, 640px); overflow-y: auto;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  @media (max-width: 480px) {
+    .brand-sub { display: none; }
+    .header-link { display: none; }
+    .wrap { padding: 12px 12px calc(40px + env(safe-area-inset-bottom)); }
+    .card { padding: 16px 14px; }
+  }
 </style>
 </head>
 <body>
 
-<h1>Fuji / <span>Film Recipe Studio</span></h1>
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <div class="brand-mark">フ</div>
+      <div class="brand-text">
+        <div class="brand-title">Film Recipe Studio</div>
+        <div class="brand-sub">Photo grading</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <a href="index.html" class="header-link">All tools</a>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
 
 <!-- STEP 1: UPLOAD -->
 <div class="card">
@@ -97,7 +248,7 @@
 
 <!-- RECIPE PICKER MODAL -->
 <div id="recipeModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:flex-end;justify-content:center;">
-  <div style="background:#fdfaf6;border-radius:16px 16px 0 0;width:100%;max-width:600px;overflow:hidden" id="recipeModalList"></div>
+  <div style="background:#FFFFFF;border-radius:16px 16px 0 0;width:100%;max-width:600px;overflow:hidden" id="recipeModalList"></div>
 </div>
 
 <!-- STEP 3: PREVIEW + ANCHOR -->
@@ -115,11 +266,11 @@
   <div class="card-title"><span class="step-num">4</span> Export</div>
   <button class="btn btn-outline" id="exportJpgBtn" disabled>Export still (JPG)</button>
 
-  <button class="btn btn-outline" id="surpriseBtn" style="border-color:#2e8c5a;color:#2e8c5a">🎲 Surprise me</button>
+  <button class="btn btn-outline" id="surpriseBtn" style="border-color:var(--accent);color:var(--accent)">🎲 Surprise me</button>
 
   <label class="opt-label">Zoom duration per photo <span class="row-val" id="durVal">3s</span></label>
   <input type="range" id="duration" min="2" max="5" value="3">
-  <p class="hint" id="totalDurHint" style="margin-top:4px;margin-bottom:0;color:#8a7560">Actual reel: <strong id="totalDurVal">—</strong></p>
+  <p class="hint" id="totalDurHint" style="margin-top:4px;margin-bottom:0;color:var(--muted)">Actual reel: <strong id="totalDurVal">—</strong></p>
 
   <label class="opt-label">Zoom amount <span class="row-val" id="zoomVal">15%</span></label>
   <input type="range" id="zoomAmt" min="5" max="40" value="15">
@@ -151,16 +302,16 @@
     <option value="bt">Zoom + pan bottom → top</option>
   </select>
 
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
-    <span style="font-size:12px;color:#5c4a32;">Dust & scratches</span>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(60,60,67,0.12);">
+    <span style="font-size:12px;color:#3A3A3C;">Dust & scratches</span>
     <input type="checkbox" id="dustToggle" checked>
   </div>
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
-    <span style="font-size:12px;color:#5c4a32;">Light leak</span>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(60,60,67,0.12);">
+    <span style="font-size:12px;color:#3A3A3C;">Light leak</span>
     <input type="checkbox" id="leakToggle" checked>
   </div>
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
-    <span style="font-size:12px;color:#5c4a32;">Film memory cover card (end of reel)</span>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(60,60,67,0.12);">
+    <span style="font-size:12px;color:#3A3A3C;">Film memory cover card (end of reel)</span>
   </div>
   <input type="text" id="coverLabel" placeholder="Type a cover label to add an end card — leave empty to skip it" style="margin-top:8px">
 
@@ -170,18 +321,18 @@
   <label class="opt-label" id="scrubLabel" style="display:none">Preview scrub <span class="row-val" id="scrubVal">0:00</span></label>
   <input type="range" id="scrubBar" min="0" max="1000" value="0" style="display:none">
 
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
-    <span style="font-size:12px;color:#5c4a32;">Watermark</span>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(60,60,67,0.12);">
+    <span style="font-size:12px;color:#3A3A3C;">Watermark</span>
     <input type="checkbox" id="wmToggle">
   </div>
   <input type="text" id="wmText" placeholder="@yourhandle or your website" style="margin-top:8px;display:none">
 
   <label class="opt-label" style="margin-top:14px">Export format</label>
   <div style="display:flex;gap:12px;margin-top:4px">
-    <label style="font-size:12px;color:#5c4a32;display:flex;align-items:center;gap:6px;cursor:pointer">
+    <label style="font-size:12px;color:#3A3A3C;display:flex;align-items:center;gap:6px;cursor:pointer">
       <input type="radio" name="exportFormat" id="fmtMp4" value="mp4" checked> MP4 (Instagram)
     </label>
-    <label style="font-size:12px;color:#5c4a32;display:flex;align-items:center;gap:6px;cursor:pointer">
+    <label style="font-size:12px;color:#3A3A3C;display:flex;align-items:center;gap:6px;cursor:pointer">
       <input type="radio" name="exportFormat" id="fmtGif" value="gif"> GIF (Reddit)
     </label>
   </div>
@@ -195,9 +346,9 @@
 
   <div class="output-wrap" id="outputWrap"></div>
 
-  <div id="markersWrap" style="display:none;margin-top:14px;background:#f0ebe3;border:1px solid #e0d6c8;border-radius:8px;padding:12px;">
-    <div style="font-size:10px;color:#a8967c;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">Music timing markers</div>
-    <div id="markersList" style="font-size:11px;color:#6b5540;line-height:1.9;"></div>
+  <div id="markersWrap" style="display:none;margin-top:14px;background:#F9F9FB;border:1px solid rgba(60,60,67,0.12);border-radius:8px;padding:12px;">
+    <div style="font-size:10px;color:#8E8E93;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">Music timing markers</div>
+    <div id="markersList" style="font-size:11px;color:#3A3A3C;line-height:1.9;"></div>
     <p class="note">Use these timestamps to line up a beat drop or transition in CapCut when adding music.</p>
   </div>
 </div>
@@ -213,12 +364,14 @@
 <div class="card" style="margin-top:24px">
   <div class="card-title" id="diagToggle" style="cursor:pointer;user-select:none">
     <span class="step-num">✓</span> Diagnostics
-    <span style="color:#b0987a;margin-left:auto;font-size:9px">TAP TO RUN</span>
+    <span style="color:#8E8E93;margin-left:auto;font-size:9px">TAP TO RUN</span>
   </div>
   <div id="diagBody" style="display:none">
-    <button class="btn btn-outline" id="runDiagBtn" style="margin-bottom:12px;background:#faf6f0;border:1px solid #d4c8b8;color:#6b5540;">▶ Run all checks</button>
+    <button class="btn btn-outline" id="runDiagBtn" style="margin-bottom:12px;">▶ Run all checks</button>
     <div id="diagResults" style="font-size:11px;line-height:2;"></div>
   </div>
+</div>
+
 </div>
 
 <script>
@@ -251,8 +404,8 @@ function setStatus(msg, color) {
     document.getElementById('photoQueue').parentNode.insertBefore(el, document.getElementById('photoQueue'));
   }
   el.textContent = msg;
-  el.style.background = color === 'ok' ? '#e8f4ee' : color === 'err' ? '#fde8e8' : '#f0ebe3';
-  el.style.color = color === 'ok' ? '#2e8c5a' : color === 'err' ? '#c0392b' : '#6b5540';
+  el.style.background = color === 'ok' ? 'rgba(0,122,255,0.12)' : color === 'err' ? '#fde8e8' : '#F9F9FB';
+  el.style.color = color === 'ok' ? '#007AFF' : color === 'err' ? '#c0392b' : '#3A3A3C';
 }
 
 function loadFiles(files) {
@@ -350,22 +503,22 @@ function renderQueue() {
   if (!photoQueue.length) { photoQueueEl.style.display = 'none'; return; }
   photoQueueEl.style.display = 'block';
   photoQueueEl.innerHTML = `
-    <div style="font-size:10px;color:#a8967c;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">${photoQueue.length} photo${photoQueue.length>1?'s':''} — tap to preview &amp; set focal point</div>
+    <div style="font-size:10px;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">${photoQueue.length} photo${photoQueue.length>1?'s':''} — tap to preview &amp; set focal point</div>
     <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">
       ${photoQueue.map((p, i) => `
-        <div style="flex-shrink:0;position:relative;border:2px solid ${p.id===activePhotoId?'#2e8c5a':'#d4c8b8'};border-radius:6px;overflow:hidden;cursor:pointer" data-id="${p.id}" class="queue-thumb">
+        <div style="flex-shrink:0;position:relative;border:2px solid ${p.id===activePhotoId?'#007AFF':'#AEAEB2'};border-radius:6px;overflow:hidden;cursor:pointer" data-id="${p.id}" class="queue-thumb">
           <img src="${p.thumbDataUrl}" style="display:block;width:80px;height:100px;object-fit:cover">
           <div style="position:absolute;top:2px;left:3px;font-size:9px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.8)">${i+1}</div>
-          ${p.gradedCanvas ? '<div style="position:absolute;top:2px;right:3px;font-size:9px;color:#2e8c5a;font-weight:700">✓</div>' : ''}
+          ${p.gradedCanvas ? '<div style="position:absolute;top:2px;right:3px;font-size:9px;color:#007AFF;font-weight:700">✓</div>' : ''}
           <div style="position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:space-between;background:rgba(60,40,10,0.5);padding:2px 3px">
-            ${i > 0 ? `<span class="q-btn" data-action="left" data-id="${p.id}" style="color:#e8e0d4;font-size:11px;cursor:pointer;padding:1px 4px">◀</span>` : '<span></span>'}
+            ${i > 0 ? `<span class="q-btn" data-action="left" data-id="${p.id}" style="color:#AEAEB2;font-size:11px;cursor:pointer;padding:1px 4px">◀</span>` : '<span></span>'}
             <span class="q-btn" data-action="del" data-id="${p.id}" style="color:#f08080;font-size:11px;cursor:pointer;padding:1px 4px">✕</span>
-            ${i < photoQueue.length-1 ? `<span class="q-btn" data-action="right" data-id="${p.id}" style="color:#e8e0d4;font-size:11px;cursor:pointer;padding:1px 4px">▶</span>` : '<span></span>'}
+            ${i < photoQueue.length-1 ? `<span class="q-btn" data-action="right" data-id="${p.id}" style="color:#AEAEB2;font-size:11px;cursor:pointer;padding:1px 4px">▶</span>` : '<span></span>'}
           </div>
         </div>
       `).join('')}
       ${photoQueue.length < MAX_PHOTOS ? `
-        <div style="flex-shrink:0;width:80px;height:100px;border:1.5px dashed #d4c8b8;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#b0987a;font-size:22px" id="addMoreBtn">+</div>
+        <div style="flex-shrink:0;width:80px;height:100px;border:1.5px dashed #AEAEB2;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:22px" id="addMoreBtn">+</div>
       ` : ''}
     </div>
   `;
@@ -658,9 +811,9 @@ function setRecipe(value) {
 
 function buildRecipeModal() {
   recipeModalList.innerHTML = Object.keys(RECIPE_NAMES).map(key => `
-    <div class="recipe-row" data-value="${key}" style="padding:18px 20px;border-bottom:1px solid #e8e0d4;cursor:pointer;">
-      <div style="font-size:19px;color:#2a2118;font-family:Georgia, serif;">${RECIPE_NAMES[key]}</div>
-      <div style="font-size:12.5px;color:#8a7560;margin-top:4px;line-height:1.5;">${RECIPE_DESCRIPTIONS[key]}</div>
+    <div class="recipe-row" data-value="${key}" style="padding:18px 20px;border-bottom:1px solid var(--border);cursor:pointer;">
+      <div style="font-size:19px;color:var(--ink);font-family:Georgia, serif;">${RECIPE_NAMES[key]}</div>
+      <div style="font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.5;">${RECIPE_DESCRIPTIONS[key]}</div>
     </div>
   `).join('');
   recipeModalList.querySelectorAll('.recipe-row').forEach(row => {
@@ -1620,7 +1773,7 @@ document.getElementById('runDiagBtn').addEventListener('click', runDiagnostics);
 
 async function runDiagnostics() {
   const out = document.getElementById('diagResults');
-  out.innerHTML = '<div style="color:#a8967c;font-size:11px;padding:4px 0">Running…</div>';
+  out.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:4px 0">Running…</div>';
   const results = [];
   function pass(label) { results.push({ ok: true, label }); }
   function fail(label, reason) { results.push({ ok: false, label, reason }); }
@@ -1845,13 +1998,13 @@ async function runDiagnostics() {
   const passed = results.filter(r => r.ok).length;
   const failed_n = results.filter(r => !r.ok).length;
   out.innerHTML = results.map(r => `
-    <div style="display:flex;align-items:flex-start;gap:8px;padding:3px 0;border-bottom:1px solid #f0ebe3">
-      <span style="color:${r.ok?'#2e8c5a':'#c0392b'};flex-shrink:0;font-weight:700;font-size:13px">${r.ok?'✓':'✗'}</span>
-      <span style="color:${r.ok?'#3d2e1a':'#c0392b'};font-size:11px">${r.label}${r.reason?`<br><span style="font-size:10px;opacity:0.75">${r.reason}</span>`:''}</span>
+    <div style="display:flex;align-items:flex-start;gap:8px;padding:3px 0;border-bottom:1px solid var(--card2)">
+      <span style="color:${r.ok?'#007AFF':'#c0392b'};flex-shrink:0;font-weight:700;font-size:13px">${r.ok?'✓':'✗'}</span>
+      <span style="color:${r.ok?'#3A3A3C':'#c0392b'};font-size:11px">${r.label}${r.reason?`<br><span style="font-size:10px;opacity:0.75">${r.reason}</span>`:''}</span>
     </div>
   `).join('') + `
     <div style="margin-top:12px;padding:8px 10px;border-radius:6px;font-size:12px;font-weight:700;
-      background:${failed_n===0?'#e8f4ee':'#fde8e8'};color:${failed_n===0?'#2e8c5a':'#c0392b'}">
+      background:${failed_n===0?'var(--accent-light)':'#fde8e8'};color:${failed_n===0?'#007AFF':'#c0392b'}">
       ${passed}/${results.length} passed${failed_n>0?` — ${failed_n} failed — see ✗ above`:' — all systems go'}
     </div>
   `;
