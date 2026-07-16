@@ -227,7 +227,7 @@
 
   <button type="button" class="btn btn-outline" id="recipePickerBtn" style="text-align:left;display:flex;justify-content:space-between;align-items:center;text-transform:none;font-weight:400;letter-spacing:0">
     <span id="recipePickerLabel">Kodachrome 64</span>
-    <span style="color:#444">▾</span>
+    <span style="color:var(--muted2)">▾</span>
   </button>
   <p class="hint" id="recipeDesc" style="margin-top:8px;margin-bottom:0">Punchy and saturated with deep blacks and warm reds — good for bold travel and street shots in strong light.</p>
 
@@ -302,16 +302,16 @@
     <option value="bt">Zoom + pan bottom → top</option>
   </select>
 
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(60,60,67,0.12);">
-    <span style="font-size:12px;color:#3A3A3C;">Dust & scratches</span>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);">
+    <span style="font-size:12px;color:var(--ink2);">Dust & scratches</span>
     <input type="checkbox" id="dustToggle" checked>
   </div>
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(60,60,67,0.12);">
-    <span style="font-size:12px;color:#3A3A3C;">Light leak</span>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);">
+    <span style="font-size:12px;color:var(--ink2);">Light leak</span>
     <input type="checkbox" id="leakToggle" checked>
   </div>
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(60,60,67,0.12);">
-    <span style="font-size:12px;color:#3A3A3C;">Film memory cover card (end of reel)</span>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);">
+    <span style="font-size:12px;color:var(--ink2);">Film memory cover card (end of reel)</span>
   </div>
   <input type="text" id="coverLabel" placeholder="Type a cover label to add an end card — leave empty to skip it" style="margin-top:8px">
 
@@ -321,18 +321,18 @@
   <label class="opt-label" id="scrubLabel" style="display:none">Preview scrub <span class="row-val" id="scrubVal">0:00</span></label>
   <input type="range" id="scrubBar" min="0" max="1000" value="0" style="display:none">
 
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(60,60,67,0.12);">
-    <span style="font-size:12px;color:#3A3A3C;">Watermark</span>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);">
+    <span style="font-size:12px;color:var(--ink2);">Watermark</span>
     <input type="checkbox" id="wmToggle">
   </div>
   <input type="text" id="wmText" placeholder="@yourhandle or your website" style="margin-top:8px;display:none">
 
   <label class="opt-label" style="margin-top:14px">Export format</label>
   <div style="display:flex;gap:12px;margin-top:4px">
-    <label style="font-size:12px;color:#3A3A3C;display:flex;align-items:center;gap:6px;cursor:pointer">
+    <label style="font-size:12px;color:var(--ink2);display:flex;align-items:center;gap:6px;cursor:pointer">
       <input type="radio" name="exportFormat" id="fmtMp4" value="mp4" checked> MP4 (Instagram)
     </label>
-    <label style="font-size:12px;color:#3A3A3C;display:flex;align-items:center;gap:6px;cursor:pointer">
+    <label style="font-size:12px;color:var(--ink2);display:flex;align-items:center;gap:6px;cursor:pointer">
       <input type="radio" name="exportFormat" id="fmtGif" value="gif"> GIF (Reddit)
     </label>
   </div>
@@ -346,9 +346,9 @@
 
   <div class="output-wrap" id="outputWrap"></div>
 
-  <div id="markersWrap" style="display:none;margin-top:14px;background:#F9F9FB;border:1px solid rgba(60,60,67,0.12);border-radius:8px;padding:12px;">
-    <div style="font-size:10px;color:#8E8E93;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">Music timing markers</div>
-    <div id="markersList" style="font-size:11px;color:#3A3A3C;line-height:1.9;"></div>
+  <div id="markersWrap" style="display:none;margin-top:14px;background:var(--accent-light);border:1px solid var(--border);border-radius:12px;padding:12px;">
+    <div style="font-size:11px;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px;font-weight:600;">Music timing markers</div>
+    <div id="markersList" style="font-size:12px;color:var(--ink2);line-height:1.9;"></div>
     <p class="note">Use these timestamps to line up a beat drop or transition in CapCut when adding music.</p>
   </div>
 </div>
@@ -364,7 +364,7 @@
 <div class="card" style="margin-top:24px">
   <div class="card-title" id="diagToggle" style="cursor:pointer;user-select:none">
     <span class="step-num">✓</span> Diagnostics
-    <span style="color:#8E8E93;margin-left:auto;font-size:9px">TAP TO RUN</span>
+    <span style="color:var(--muted);margin-left:auto;font-size:10px;font-weight:600">TAP TO RUN</span>
   </div>
   <div id="diagBody" style="display:none">
     <button class="btn btn-outline" id="runDiagBtn" style="margin-bottom:12px;">▶ Run all checks</button>
@@ -372,7 +372,7 @@
   </div>
 </div>
 
-</div>
+</div><!-- /.wrap -->
 
 <script>
 const fileInput = document.getElementById('fileInput');

@@ -1,0 +1,1008 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Film Strip Studio</title>
+<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@4.3.3/build/mp4-muxer.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #f5f0ea; color: #2a2118; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; min-height: 100vh; padding: 20px 16px 60px; }
+  h1 { font-size: 12px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: #a8967c; margin-bottom: 24px; }
+  h1 span { color: #2a2118; }
+  .card { background: #fdfaf6; border: 1px solid #e8e0d4; border-radius: 12px; padding: 18px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(60,40,10,0.06); }
+  .card-title { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #b0987a; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .step-num { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #e8f4ee; color: #2e8c5a; font-size: 9px; font-weight: 700; flex-shrink: 0; }
+  .hint { font-size: 11px; color: #8a7560; line-height: 1.6; margin-bottom: 12px; }
+
+  .drop-zone { border: 1.5px dashed #d4c8b8; border-radius: 8px; padding: 28px 16px; text-align: center; cursor: pointer; transition: border-color 0.2s; position: relative; background: #faf6f0; }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: #2e8c5a; }
+  .drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .drop-icon { font-size: 24px; margin-bottom: 6px; }
+  .drop-label { font-size: 12px; color: #b0987a; }
+  .drop-label strong { color: #5c4a32; }
+
+  select, input[type=range] { width: 100%; background: #faf6f0; border: 1px solid #d4c8b8; border-radius: 6px; color: #2a2118; font-size: 12px; padding: 8px 10px; outline: none; appearance: none; -webkit-appearance: none; }
+  input[type=range] { padding: 0; height: 26px; }
+  .opt-label { font-size: 10px; color: #a8967c; margin: 10px 0 5px; letter-spacing: 0.08em; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; }
+  .row-val { font-size: 11px; color: #2e8c5a; font-weight: 600; }
+
+  .btn { width: 100%; padding: 12px; border-radius: 8px; border: none; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: opacity 0.2s; margin-top: 8px; }
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .btn-green { background: #2e8c5a; color: #fff; padding: 14px; font-size: 13px; }
+  .btn-green:not(:disabled):hover { opacity: 0.85; }
+  .btn-outline { background: #faf6f0; border: 1px solid #d4c8b8; color: #6b5540; }
+  .btn-outline:not(:disabled):hover { border-color: #a8967c; color: #2a2118; }
+
+  .count-row { display: flex; gap: 8px; }
+  .count-opt { flex: 1; padding: 9px 0; border-radius: 6px; border: 1px solid #d4c8b8; background: #faf6f0; color: #6b5540; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .count-opt:hover { border-color: #a8967c; }
+  .count-opt.active { background: #2e8c5a; border-color: #2e8c5a; color: #fff; }
+
+  .qrow { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid #f0e8dc; }
+  .qrow:last-child { border-bottom: none; }
+  .qthumb { width: 54px; height: 30px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background: #e8e0d4; }
+  .qslot { font-size: 9px; font-weight: 700; color: #b0987a; width: 14px; flex-shrink: 0; letter-spacing: .06em; }
+  .qctl { flex: 1; min-width: 0; }
+  .qctl .opt-label { margin: 0 0 3px; }
+
+  .canvas-wrap { position: relative; margin-top: 12px; display: none; }
+  .canvas-wrap.show { display: block; }
+  canvas { width: 100%; border-radius: 8px; display: block; background: #e8e0d4; }
+  .note { font-size: 10px; color: #b0987a; margin-top: 8px; line-height: 1.5; }
+
+  .progress-wrap { display: none; margin-top: 12px; }
+  .progress-wrap.show { display: block; }
+  .progress-bg { background: #e8e0d4; border-radius: 3px; height: 3px; overflow: hidden; margin-bottom: 6px; }
+  .progress-fill { height: 100%; background: #2e8c5a; border-radius: 3px; transition: width 0.2s; width: 0%; }
+  .progress-lbl { font-size: 10px; color: #a8967c; }
+
+  .output-wrap { display: none; margin-top: 14px; }
+  .output-wrap.show { display: block; }
+  .preview-video { width: 100%; border-radius: 8px; max-height: 420px; object-fit: contain; background: #2a2118; display: block; }
+  .dl-link { display: block; text-align: center; margin-top: 10px; text-decoration: none; padding: 13px; border-radius: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; background: #2e8c5a; color: #fff; }
+</style>
+</head>
+<body>
+
+<h1>Film Strip <span>Studio</span></h1>
+
+<!-- 1. PHOTOS -->
+<div class="card">
+  <div class="card-title"><span class="step-num">1</span> Photos</div>
+  <p class="hint" id="countHint">Add 2 to 4 photos. Each one becomes a band in the strip.</p>
+  <div class="drop-zone" id="dropZone">
+    <div class="drop-icon">🎞</div>
+    <div class="drop-label"><strong>Tap to add photos</strong><br>or drop them here</div>
+    <input type="file" id="fileInput" accept="image/*" multiple>
+  </div>
+  <div id="queue" style="margin-top:6px;"></div>
+</div>
+
+<!-- 2. LOOK -->
+<div class="card">
+  <div class="card-title"><span class="step-num">2</span> Look</div>
+  <label class="opt-label"><span>Film recipe</span></label>
+  <select id="recipe">
+    <option value="portra400">Kodak Portra 400</option>
+    <option value="gold200">Kodak Gold 200</option>
+    <option value="trix400">Kodak Tri-X 400 (B&amp;W)</option>
+    <option value="ultramax400">Kodak Ultramax 400</option>
+    <option value="kodachrome64">Kodachrome 64</option>
+  </select>
+  <p class="hint" id="recipeDesc" style="margin-top:8px;margin-bottom:12px;"></p>
+  <label class="opt-label"><span>Border</span></label>
+  <select id="border">
+    <option value="none">None</option>
+    <option value="film35">35mm film edge (perfs + edge print)</option>
+    <option value="sprocket">35mm sprockets</option>
+    <option value="rebate">Film rebate</option>
+    <option value="white">White film border</option>
+    <option value="black">Cinema border</option>
+    <option value="polaroid">Polaroid</option>
+    <option value="instax">Instax mini</option>
+    <option value="vignette">Soft vignette</option>
+  </select>
+  <p class="note" id="borderNote" style="margin-bottom:0;">Borders sit on every band, because each band is a frame. The 35mm film edge carries real perforations plus edge print showing your recipe and the frame number, and it follows the slide direction the way markings run along real film.</p>
+</div>
+
+<!-- 3. MOTION -->
+<div class="card">
+  <div class="card-title"><span class="step-num">3</span> Motion</div>
+  <p class="hint">The strip advances one band at a time and wraps around, so the loop closes with no seam.</p>
+  <label class="opt-label"><span>Direction</span></label>
+  <div class="count-row">
+    <button class="count-opt active" data-axis="auto" type="button">Auto</button>
+    <button class="count-opt" data-axis="v" type="button">↕ Rows</button>
+    <button class="count-opt" data-axis="h" type="button">↔ Columns</button>
+  </div>
+  <p class="note" id="axisNote" style="margin-bottom:2px;"></p>
+  <label class="opt-label"><span>Hold before each advance</span> <span class="row-val" id="holdVal">0.9s</span></label>
+  <input type="range" id="hold" min="40" max="200" value="90">
+  <p class="note" id="durNote"></p>
+</div>
+
+<!-- 4. PREVIEW -->
+<div class="card">
+  <div class="card-title"><span class="step-num">4</span> Preview</div>
+  <div class="canvas-wrap" id="canvasWrap">
+    <canvas id="canvas"></canvas>
+    <label class="opt-label" style="margin-top:10px;"><span>Scrub</span> <span class="row-val" id="scrubVal">frame 1</span></label>
+    <input type="range" id="scrub" min="0" max="100" value="0">
+    <button class="btn btn-outline" id="playBtn" type="button">Play loop</button>
+  </div>
+  <p class="hint" id="previewHint" style="margin-bottom:0;">Add your photos to see the strip.</p>
+</div>
+
+<!-- 5. EXPORT -->
+<div class="card">
+  <div class="card-title"><span class="step-num">5</span> Export</div>
+  <button class="btn btn-green" id="exportBtn" disabled type="button">Build reel</button>
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bg"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-lbl" id="progressLbl"></div>
+  </div>
+  <div class="output-wrap" id="outputWrap">
+    <video class="preview-video" id="outVideo" controls loop playsinline></video>
+    <a class="dl-link" id="dlLink" download="film-strip.mp4">Download</a>
+  </div>
+</div>
+
+<script>
+// ---- Core helpers ----
+function clamp(v) { return v < 0 ? 0 : v > 255 ? 255 : v; }
+
+function addGrain(p, idx, amount) {
+  if (amount <= 0) return;
+  const n = (Math.random() - 0.5) * amount;
+  p[idx] = clamp(p[idx] + n);
+  p[idx+1] = clamp(p[idx+1] + n);
+  p[idx+2] = clamp(p[idx+2] + n);
+}
+// ==================== Film LUT engine ====================
+// Each recipe is defined as a set of parameters fed into a shared grading pipeline:
+//   1. sRGB → linear (remove gamma)
+//   2. 3x3 color mixing matrix (cross-channel bleed, like dye layers in film)
+//   3. Per-channel S-curve tone mapping (shadows / midtones / highlights independently)
+//   4. Global luminance S-curve
+//   5. Shadow tint + highlight tint (split toning)
+//   6. Saturation (HSL, applied after toning)
+//   7. linear → sRGB (re-apply gamma)
+// Precomputed into a 256-entry LUT per recipe for performance.
+
+function srgbToLinear(v) {
+  v /= 255;
+  return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+}
+function linearToSrgb(v) {
+  v = v < 0 ? 0 : v > 1 ? 1 : v;
+  return (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055) * 255;
+}
+
+// Catmull-Rom spline through control points [[x,y], ...] → function(t) -> value
+function makeCurve(points) {
+  return function(x) {
+    x = Math.max(0, Math.min(1, x));
+    for (let i = 0; i < points.length - 1; i++) {
+      const [x0, y0] = points[i], [x1, y1] = points[i + 1];
+      if (x <= x1 || i === points.length - 2) {
+        const t = x1 === x0 ? 0 : (x - x0) / (x1 - x0);
+        // cubic ease in-out between points, using neighboring slopes for smoothness
+        const p0 = i > 0 ? points[i - 1] : points[i];
+        const p3 = i < points.length - 2 ? points[i + 2] : points[i + 1];
+        const m0 = (y1 - p0[1]) / 2, m1 = (p3[1] - y0) / 2;
+        const t2 = t * t, t3 = t2 * t;
+        return (2*t3 - 3*t2 + 1)*y0 + (t3 - 2*t2 + t)*m0 + (-2*t3 + 3*t2)*y1 + (t3 - t2)*m1;
+      }
+    }
+    return points[points.length - 1][1];
+  };
+}
+
+// Build a 256-entry precomputed LUT from a curve function (input 0-1, output 0-1)
+function buildLUT(curveFn) {
+  const lut = new Float32Array(256);
+  for (let i = 0; i < 256; i++) lut[i] = curveFn(i / 255);
+  return lut;
+}
+
+// Apply a 3x3 matrix to linear RGB (values 0-1). Matrix is row-major [R_out, G_out, B_out].
+function applyMatrix(r, g, b, m) {
+  return [
+    m[0]*r + m[1]*g + m[2]*b,
+    m[3]*r + m[4]*g + m[5]*b,
+    m[6]*r + m[7]*g + m[8]*b
+  ];
+}
+
+// Split toning: shadowColor/highlightColor are [r,g,b] in 0-1, strength 0-1
+function splitTone(r, g, b, shadowColor, shadowStr, highlightColor, highlightStr) {
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  // Shadow: affects dark tones (1-lum), highlight: affects bright tones (lum)
+  const sw = Math.max(0, 1 - lum * 2.2) * shadowStr;
+  const hw = Math.max(0, lum * 2.2 - 1.2) * highlightStr;
+  return [
+    r + (shadowColor[0] - r) * sw + (highlightColor[0] - r) * hw,
+    g + (shadowColor[1] - g) * sw + (highlightColor[1] - g) * hw,
+    b + (shadowColor[2] - b) * sw + (highlightColor[2] - b) * hw
+  ];
+}
+
+function buildRecipeLUT(def) {
+  const rCurve = buildLUT(makeCurve(def.curveR));
+  const gCurve = buildLUT(makeCurve(def.curveG));
+  const bCurve = buildLUT(makeCurve(def.curveB));
+  const lCurve = buildLUT(makeCurve(def.curveLum));
+
+  // Precompute linear LUT for sRGB decoding
+  const linTable = new Float32Array(256);
+  for (let i = 0; i < 256; i++) linTable[i] = srgbToLinear(i);
+
+  return function(r0, g0, b0) {
+    // 1. to linear
+    let r = linTable[r0], g = linTable[g0], b = linTable[b0];
+
+    // 2. color mixing matrix
+    if (def.matrix) [r, g, b] = applyMatrix(r, g, b, def.matrix);
+    r = r < 0 ? 0 : r > 1 ? 1 : r;
+    g = g < 0 ? 0 : g > 1 ? 1 : g;
+    b = b < 0 ? 0 : b > 1 ? 1 : b;
+
+    // 3. per-channel curves (apply in linear light)
+    r = rCurve[Math.round(r * 255)];
+    g = gCurve[Math.round(g * 255)];
+    b = bCurve[Math.round(b * 255)];
+
+    // 4. global luminance curve
+    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const lumMapped = lCurve[Math.round(lum * 255)];
+    const lumScale = lum > 0.001 ? lumMapped / lum : 1;
+    r *= lumScale; g *= lumScale; b *= lumScale;
+
+    // 5. split toning
+    if (def.shadowColor || def.highlightColor) {
+      [r, g, b] = splitTone(r, g, b,
+        def.shadowColor || [0,0,0], def.shadowStr || 0,
+        def.highlightColor || [1,1,1], def.highlightStr || 0
+      );
+    }
+
+    // 6. saturation
+    if (def.saturation !== 0) {
+      const l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      const s = def.saturation;
+      r = l + (r - l) * (1 + s);
+      g = l + (g - l) * (1 + s);
+      b = l + (b - l) * (1 + s);
+    }
+
+    // 7. base fog. Colour negative film carries an orange mask, so no channel
+    // ever reaches zero. This must sit AFTER saturation: saturation pushes the
+    // channels apart and would otherwise crush the low one to black, which is
+    // what shadowColor at step 5 was trying and failing to prevent. Clamp
+    // first, because saturation can drive a channel below zero and a lift on
+    // its own would leave it there.
+    if (def.floor) {
+      const f = def.floor;
+      r = f + (r < 0 ? 0 : r) * (1 - f);
+      g = f + (g < 0 ? 0 : g) * (1 - f);
+      b = f + (b < 0 ? 0 : b) * (1 - f);
+    }
+
+    // 8. back to sRGB
+    return [
+      clamp(linearToSrgb(r)),
+      clamp(linearToSrgb(g)),
+      clamp(linearToSrgb(b))
+    ];
+  };
+}
+
+// ---- Recipe definitions ----
+// Curves are control points [[linear_in, linear_out], ...], values 0-1.
+// The identity is [[0,0],[1,1]]. Lifting the shadow end fades blacks; pulling
+// the highlight end down reduces highlight contrast.
+
+const RECIPE_DEFS = {
+  portra400: {
+    // Kodak Portra 400 — the portrait standard.
+    // Lifted milky shadows, warm skin, gentle highlight rolloff.
+    curveR: [[0,0.02],[0.25,0.29],[0.5,0.55],[0.75,0.79],[1,0.98]],
+    curveG: [[0,0.015],[0.25,0.265],[0.5,0.52],[0.75,0.77],[1,0.97]],
+    curveB: [[0,0.025],[0.25,0.255],[0.5,0.49],[0.75,0.73],[1,0.93]],
+    curveLum: [[0,0.015],[0.25,0.235],[0.5,0.49],[0.75,0.75],[1,0.97]],
+    matrix: [1.04,-0.02,-0.02, 0.01,1.00,-0.01, -0.02,-0.01,1.03],
+    shadowColor: [0.16,0.10,0.07], shadowStr: 0.08,
+    highlightColor: [1.0,0.97,0.92], highlightStr: 0.14,
+    saturation: -0.08
+  },
+
+  gold200: {
+    // Kodak Gold 200 — warm consumer film.
+    // Warmer than Portra: golden-orange highlights, slight green in shadows.
+    // Skin reads golden-warm. More saturation than Portra. Classic holiday feel.
+    curveR: [[0,0.01],[0.25,0.30],[0.5,0.57],[0.75,0.82],[1,0.99]],
+    curveG: [[0,0.01],[0.25,0.27],[0.5,0.535],[0.75,0.785],[1,0.97]],
+    curveB: [[0,0.02],[0.25,0.24],[0.5,0.485],[0.75,0.725],[1,0.91]],
+    curveLum: [[0,0.01],[0.25,0.245],[0.5,0.505],[0.75,0.77],[1,0.98]],
+    matrix: [1.05,-0.02,-0.03, 0.01,1.02,-0.03, -0.02,-0.01,1.03],
+    shadowColor: [0.06,0.10,0.06], shadowStr: 0.14,
+    highlightColor: [1.0,0.96,0.84], highlightStr: 0.18,
+    saturation: 0.10
+  },
+
+  trix400: {
+    // Kodak Tri-X 400 — classic high-contrast B&W, warm-toned print.
+    // The S-curve pivots on linear 0.216, which is sRGB mid-grey, so mid-grey
+    // renders as mid-grey (box speed). Pivoting on linear 0.5 instead put the
+    // hinge up at sRGB 188 and dragged the midtones a third of a stop down,
+    // which read as pushed film rather than Tri-X at 400.
+    curveR: [[0,0],[0.2,0.14],[0.5,0.52],[0.8,0.90],[1,1]],
+    curveG: [[0,0],[0.2,0.14],[0.5,0.52],[0.8,0.90],[1,1]],
+    curveB: [[0,0],[0.2,0.14],[0.5,0.52],[0.8,0.90],[1,1]],
+    curveLum: [[0,0],[0.088,0.038],[0.216,0.216],[0.51,0.652],[1,1]],
+    matrix: null,
+    shadowColor: [0,0,0], shadowStr: 0,
+    highlightColor: [1.0,0.96,0.87], highlightStr: 1.0,
+    saturation: -1.0,
+    bw: true
+  },
+
+  ultramax400: {
+    // Kodak Ultramax 400 — punchy consumer negative film.
+    // Warmer than Portra but less golden than Gold; higher contrast and
+    // stronger saturation. Vivid reds and greens, healthy warm skin.
+    curveR: [[0,0.015],[0.25,0.28],[0.5,0.55],[0.75,0.815],[1,1.0]],
+    curveG: [[0,0.012],[0.25,0.265],[0.5,0.53],[0.75,0.785],[1,0.985]],
+    curveB: [[0,0.02],[0.25,0.245],[0.5,0.49],[0.75,0.74],[1,0.945]],
+    curveLum: [[0,0.0],[0.2,0.178],[0.5,0.520],[0.8,0.872],[1,1.0]],
+    matrix: [1.06,-0.03,-0.03, -0.02,1.05,-0.03, -0.02,-0.02,1.05],
+    shadowColor: [0.08,0.08,0.10], shadowStr: 0.06,
+    highlightColor: [1.0,0.96,0.88], highlightStr: 0.12,
+    // Base fog, because this is a colour negative like Gold and negatives are
+    // defined by their shadow latitude. Without it, saturation crushed a
+    // channel on a quarter of all colours and the blacks sat at slide-film
+    // density. Saturation is nudged up to pay back what the fog costs.
+    saturation: 0.19,
+    floor: 0.009
+  },
+
+  kodachrome64: {
+    // Kodachrome 64 — the iconic slide film.
+    // Dense, un-lifted blacks, high micro-contrast, famously deep reds and
+    // restrained, slightly cyan blues. Rich rather than bright.
+    curveR: [[0,0.0],[0.25,0.27],[0.5,0.55],[0.75,0.82],[1,1.0]],
+    curveG: [[0,0.0],[0.22,0.20],[0.5,0.50],[0.78,0.80],[1,0.985]],
+    curveB: [[0,0.0],[0.25,0.22],[0.5,0.46],[0.75,0.72],[1,0.93]],
+    curveLum: [[0,0.0],[0.18,0.11],[0.5,0.51],[0.82,0.90],[1,1.0]],
+    matrix: [1.08,-0.05,-0.03, -0.04,1.04,-0.02, -0.03,-0.05,1.08],
+    shadowColor: [0.05,0.05,0.08], shadowStr: 0.10,
+    highlightColor: [1.0,0.95,0.85], highlightStr: 0.10,
+    saturation: 0.08
+  }
+};
+
+// Build all LUTs once at startup
+const RECIPES = {};
+for (const [key, def] of Object.entries(RECIPE_DEFS)) {
+  if (def.bw) {
+    // For B&W, convert to luma first then apply a single curve
+    const lumIn = new Float32Array(256);
+    for (let i = 0; i < 256; i++) lumIn[i] = srgbToLinear(i);
+    const lCurve = buildLUT(makeCurve(def.curveLum));
+    const hColor = def.highlightColor || [1,1,1];
+    const hStr = def.highlightStr || 0;
+    RECIPES[key] = (r0, g0, b0) => {
+      const lum = 0.2126 * lumIn[r0] + 0.7152 * lumIn[g0] + 0.0722 * lumIn[b0];
+      const v = lCurve[Math.round(lum * 255)];
+      // Warm tone, the way a warm-toned print actually behaves: neutral in the
+      // deep shadows, warming steadily up through the midtones into the
+      // highlights. Two fixes over the old version. The weight now ramps from
+      // low down instead of gating above linear 0.5, which is sRGB 188 and left
+      // everything but the brightest sliver untouched. And the tint multiplies
+      // rather than lerping toward a bright colour, so it shifts hue without
+      // also lifting exposure.
+      const hw = Math.min(1, Math.max(0, (v - 0.05) / 0.55)) * hStr;
+      return [
+        clamp(linearToSrgb(v * (1 + (hColor[0] - 1) * hw))),
+        clamp(linearToSrgb(v * (1 + (hColor[1] - 1) * hw))),
+        clamp(linearToSrgb(v * (1 + (hColor[2] - 1) * hw)))
+      ];
+    };
+  } else {
+    RECIPES[key] = buildRecipeLUT(def);
+  }
+}
+const RECIPE_DESCRIPTIONS = {
+  portra400: 'Soft, warm, low-contrast skin tones — best for portraits, golden hour, and relaxed everyday shots.',
+  gold200: 'Warm, slightly saturated consumer film look — orange-yellow highlights, green-leaning shadows, golden skin tones.',
+  trix400: 'High-contrast black & white with a touch of warmth in the highlights — classic for moody portrait and street shots.',
+  ultramax400: 'Punchy, saturated consumer film — warm skin, vivid reds and greens, more contrast than Gold. Great for bright travel and street.',
+  kodachrome64: 'Iconic slide film — dense blacks, high micro-contrast, deep reds and restrained blues. Rich and bold in strong light.'
+};
+const RECIPE_NAMES = {
+  portra400: 'Kodak Portra 400', gold200: 'Kodak Gold 200', trix400: 'Kodak Tri-X 400 (B&W)',
+  ultramax400: 'Kodak Ultramax 400', kodachrome64: 'Kodachrome 64'
+};
+
+
+// ==================== Grading ====================
+function gradeImageData(srcCanvas) {
+  const key = document.getElementById('recipe').value;
+  const fn = RECIPES[key];
+  const out = document.createElement('canvas');
+  out.width = srcCanvas.width; out.height = srcCanvas.height;
+  const octx = out.getContext('2d', { willReadFrequently: true });
+  octx.drawImage(srcCanvas, 0, 0);
+  const id = octx.getImageData(0, 0, out.width, out.height);
+  const d = id.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const [r, g, b] = fn(d[i], d[i+1], d[i+2]);
+    d[i] = r; d[i+1] = g; d[i+2] = b;
+  }
+  octx.putImageData(id, 0, 0);
+  return out;
+}
+
+// ==================== State ====================
+const W = 1080, H = 1920, FPS = 30, MOVE_SEC = 0.22;
+// The strip returns to its start after N advances, so one cycle is a complete
+// loop. Playing it twice makes the export long enough to read on Reels while
+// staying seamless, because the join at the halfway point is the same seamless
+// join as the wrap.
+const LOOPS = 2;
+const MIN_BANDS = 2, MAX_BANDS = 4;
+// The band count is however many photos you added. Holding it as separate state
+// only lets the two disagree.
+function bandCount() { return Math.max(MIN_BANDS, Math.min(MAX_BANDS, photos.length)); }
+let axisMode = 'auto'; // 'auto' | 'v' | 'h'
+let photos = []; // { baseCanvas, gradedCanvas, framing }
+let playTimer = null;
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+canvas.width = W; canvas.height = H;
+
+// ==================== Cycle maths ====================
+// A strip of film advances through a gate one frame at a time. The whole stack
+// slides up by one band and the top band wraps to the bottom, so after N
+// advances the strip is exactly back where it started and the loop is seamless.
+function pullDown(t) {
+  // Projector pull-down: a fast yank that overshoots ~3% and settles.
+  const c1 = 0.9, c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+}
+
+// Which way the strip runs. A tall photo is sliced into wide bands that stack
+// and slide vertically. A wide photo is sliced into narrow columns that sit
+// side by side and slide horizontally. Either way the strip advances along the
+// photo's long axis, so the slicing reads the same in both orientations.
+function autoAxis() {
+  if (!photos.length) return 'v';
+  let wide = 0;
+  photos.forEach(p => { if (p.baseCanvas.width > p.baseCanvas.height) wide++; });
+  return wide > photos.length / 2 ? 'h' : 'v';
+}
+
+function activeAxis() {
+  return axisMode === 'auto' ? autoAxis() : axisMode;
+}
+
+function buildTimeline() {
+  const N = bandCount();
+  const axis = activeAxis();
+  const span = axis === 'v' ? H : W;   // length of the axis the strip slides along
+  const holdSec = parseInt(document.getElementById('hold').value, 10) / 100;
+  const holdF = Math.round(holdSec * FPS);
+  const moveF = Math.round(MOVE_SEC * FPS);
+  const beatF = holdF + moveF;
+  return { N, axis, span, bandSpan: span / N, holdF, moveF, beatF, cycleFrames: N * beatF, totalFrames: N * beatF * LOOPS };
+}
+
+function offsetAt(tl, fi) {
+  const beat = Math.floor(fi / tl.beatF);
+  const inBeat = fi - beat * tl.beatF;
+  let base = beat * tl.bandSpan;
+  if (inBeat >= tl.holdF) {
+    const t = Math.min(1, (inBeat - tl.holdF + 1) / tl.moveF);
+    base += pullDown(t) * tl.bandSpan;
+  }
+  return base;
+}
+
+// ==================== Drawing ====================
+// Cover-crop a photo into one band. framing (0..1) picks which slice of the
+// photo survives the crop, because a tall photo loses a lot in a wide band.
+// ==================== Borders ====================
+function roundRectOnCtx(octx, x, y, w, h, r, fill) {
+  octx.beginPath();
+  octx.moveTo(x + r, y);
+  octx.arcTo(x + w, y, x + w, y + h, r);
+  octx.arcTo(x + w, y + h, x, y + h, r);
+  octx.arcTo(x, y + h, x, y, r);
+  octx.arcTo(x, y, x + w, y, r);
+  octx.closePath();
+  octx.fillStyle = fill;
+  octx.fill();
+}
+
+// One perforated edge bar. `along` is the direction the strip runs, so holes
+// march down that axis. The pitch is forced to divide the band exactly, which
+// keeps the holes evenly spaced across band joins instead of stuttering.
+function drawSprocketBar(octx, x, y, w, h, along, t) {
+  octx.fillStyle = '#0a0a0a';
+  octx.fillRect(x, y, w, h);
+  const run = along === 'v' ? h : w;
+  const holeAcross = t * 0.34, holeAlong = t * 0.5;
+  const want = holeAlong * 1.95;
+  const count = Math.max(1, Math.round(run / want));
+  const pitch = run / count;
+  for (let k = 0; k < count; k++) {
+    const c = (k + 0.5) * pitch;
+    // Perforations are punched through, so on a backlit strip they read light
+    // against the dark film edge. Drawing them darker makes them invisible.
+    if (along === 'v') {
+      roundRectOnCtx(octx, x + (w - holeAcross) / 2, y + c - holeAlong / 2, holeAcross, holeAlong, 3, '#efe9dd');
+    } else {
+      roundRectOnCtx(octx, x + c - holeAlong / 2, y + (h - holeAcross) / 2, holeAlong, holeAcross, 3, '#efe9dd');
+    }
+  }
+}
+
+// Full 35mm film edge: perforations near the outer edge, edge print inboard of
+// them. Real film carries its stock name and frame number as a latent image in
+// orange ink, and the frame number travels with the frame, so each band gets
+// its own. The strip runs along the slide axis, so the bars sit on the edges
+// parallel to it and contiguous bands form one continuous piece of film.
+function film35Stock() {
+  const key = document.getElementById('recipe').value;
+  const name = RECIPE_NAMES[key] || 'FILM';
+  return name.replace(/\s*\(.*\)\s*/, '').toUpperCase();
+}
+
+function drawFilm35(octx, bx, by, bw, bh, axis, idx) {
+  const vert = axis === 'v';
+  const T = W * 0.085;
+  const marks = [film35Stock(), '35MM  ' + (idx + 1) + 'A  \u25B6'];
+  const run = vert ? bh : bw;
+  // Real 35mm KS perforations are 2.79mm across the film by 1.98mm along it,
+  // so they are wider than they are tall, at a pitch of 4.75mm. Keeping that
+  // ratio is what makes the edge read as film rather than as a dotted line.
+  const holeAcross = T * 0.36, holeAlong = T * 0.26;
+  const count = Math.max(1, Math.round(run / (holeAlong * 2.4)));
+  const pitch = run / count;
+  const perfOff = T * 0.30, textOff = T * 0.76;
+
+  for (let s = 0; s < 2; s++) {
+    const first = s === 0;
+    // The dark film base for this edge.
+    octx.fillStyle = '#0d0d0a';
+    if (vert) octx.fillRect(first ? bx : bx + bw - T, by, T, bh);
+    else octx.fillRect(bx, first ? by : by + bh - T, bw, T);
+
+    // Perforations: punched through, so they read light.
+    for (let k = 0; k < count; k++) {
+      const c = (k + 0.5) * pitch;
+      if (vert) {
+        const cx = first ? bx + perfOff : bx + bw - perfOff;
+        roundRectOnCtx(octx, cx - holeAcross / 2, by + c - holeAlong / 2, holeAcross, holeAlong, 3, '#efe9dd');
+      } else {
+        const cy = first ? by + perfOff : by + bh - perfOff;
+        roundRectOnCtx(octx, bx + c - holeAlong / 2, cy - holeAcross / 2, holeAlong, holeAcross, 3, '#efe9dd');
+      }
+    }
+
+    // Edge print, in the orange of a latent-image marking.
+    octx.fillStyle = '#d9932c';
+    octx.font = Math.round(T * 0.19) + 'px monospace';
+    octx.textBaseline = 'middle';
+    octx.textAlign = 'center';
+    if (vert) {
+      octx.save();
+      octx.translate(first ? bx + textOff : bx + bw - textOff, by + bh / 2);
+      octx.rotate(-Math.PI / 2);
+      octx.fillText(marks[s], 0, 0);
+      octx.restore();
+    } else {
+      octx.fillText(marks[s], bx + bw / 2, first ? by + textOff : by + bh - textOff);
+    }
+  }
+}
+
+// Borders are drawn per band, because the bands are the frames. Sprockets and
+// rebate sit on the edges running parallel to the slide, the way perforations
+// run along real film, so contiguous bands form one continuous strip.
+function drawBandBorder(octx, bx, by, bw, bh, axis, style, idx) {
+  if (!style || style === 'none' || style === 'vignette') return;
+  const vert = axis === 'v';
+  octx.save();
+  // Clip to the band. The rebate text in particular can be wider than a narrow
+  // column, and without this it would bleed onto the neighbouring band.
+  octx.beginPath();
+  octx.rect(bx, by, bw, bh);
+  octx.clip();
+  if (style === 'film35') {
+    drawFilm35(octx, bx, by, bw, bh, axis, idx);
+  } else if (style === 'white' || style === 'black') {
+    const b = W * 0.022;
+    octx.fillStyle = style === 'white' ? '#f4f0e8' : '#000';
+    octx.fillRect(bx, by, bw, b);
+    octx.fillRect(bx, by + bh - b, bw, b);
+    octx.fillRect(bx, by, b, bh);
+    octx.fillRect(bx + bw - b, by, b, bh);
+  } else if (style === 'sprocket') {
+    const t = W * 0.06;
+    if (vert) {
+      drawSprocketBar(octx, bx, by, t, bh, 'v', t);
+      drawSprocketBar(octx, bx + bw - t, by, t, bh, 'v', t);
+    } else {
+      drawSprocketBar(octx, bx, by, bw, t, 'h', t);
+      drawSprocketBar(octx, bx, by + bh - t, bw, t, 'h', t);
+    }
+  } else if (style === 'rebate') {
+    const t = W * 0.05;
+    octx.fillStyle = '#111';
+    if (vert) {
+      octx.fillRect(bx, by, t, bh);
+      octx.fillRect(bx + bw - t, by, t, bh);
+    } else {
+      octx.fillRect(bx, by, bw, t);
+      octx.fillRect(bx, by + bh - t, bw, t);
+    }
+    octx.fillStyle = '#8a8378';
+    octx.font = Math.round(t * 0.42) + 'px monospace';
+    octx.textBaseline = 'middle';
+    octx.textAlign = 'center';
+    const mark = 'KODAK  ' + String(new Date().getFullYear()).slice(2) + 'A  ◯ ◯ ◯';
+    if (vert) {
+      // Text runs down the strip, so rotate it onto the edge bar.
+      octx.save();
+      octx.translate(bx + t * 0.5, by + bh / 2);
+      octx.rotate(-Math.PI / 2);
+      octx.fillText(mark, 0, 0);
+      octx.restore();
+    } else {
+      octx.fillText(mark, bx + bw / 2, by + t * 0.5);
+    }
+  } else if (style === 'polaroid' || style === 'instax') {
+    const po = style === 'polaroid';
+    const side = W * (po ? 0.028 : 0.02), top = side, bottom = W * (po ? 0.08 : 0.055);
+    octx.fillStyle = po ? '#f7f4ec' : '#fff';
+    octx.fillRect(bx, by, bw, top);
+    octx.fillRect(bx, by + bh - bottom, bw, bottom);
+    octx.fillRect(bx, by, side, bh);
+    octx.fillRect(bx + bw - side, by, side, bh);
+  }
+  octx.restore();
+}
+
+// Vignette is the one style that reads better across the whole frame than
+// repeated on every band, so it is applied once after the strip is drawn.
+function drawVignette(octx) {
+  const grad = octx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.72);
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.55)');
+  octx.save();
+  octx.fillStyle = grad;
+  octx.fillRect(0, 0, W, H);
+  octx.restore();
+}
+
+// pos is the band's position along the sliding axis. On the vertical axis a
+// band is a full-width row; on the horizontal axis it is a full-height column.
+function drawBand(octx, img, pos, tl, framing, idx) {
+  const vert = tl.axis === 'v';
+  const bx = vert ? 0 : pos, by = vert ? pos : 0;
+  const bw = vert ? W : tl.bandSpan, bh = vert ? tl.bandSpan : H;
+  if (bx + bw <= 0 || bx >= W || by + bh <= 0 || by >= H) return; // off-canvas
+  octx.save();
+  octx.beginPath();
+  octx.rect(bx, by, bw, bh);
+  octx.clip();
+  const scale = Math.max(bw / img.width, bh / img.height);
+  const dw = img.width * scale, dh = img.height * scale;
+  // A cover-crop only ever leaves slack on one axis. Let framing slide along
+  // whichever axis that is, so the control does something for every photo:
+  // vertical for a tall photo, horizontal for a wide one.
+  const dx = bx - (dw - bw) * framing;
+  const dy = by - (dh - bh) * framing;
+  octx.drawImage(img, dx, dy, dw, dh);
+  octx.restore();
+  drawBandBorder(octx, bx, by, bw, bh, tl.axis, borderStyle(), idx);
+}
+
+function renderFrame(octx, tl, fi) {
+  octx.fillStyle = '#000';
+  octx.fillRect(0, 0, W, H);
+  if (!photos.length) return;
+  const off = offsetAt(tl, fi);
+  for (let i = 0; i < tl.N; i++) {
+    const p = photos[i];
+    if (!p || !p.gradedCanvas) continue;
+    let pos = (i * tl.bandSpan - off) % tl.span;
+    if (pos < 0) pos += tl.span;
+    drawBand(octx, p.gradedCanvas, pos, tl, p.framing, i);
+    drawBand(octx, p.gradedCanvas, pos - tl.span, tl, p.framing, i); // wrap copy
+  }
+  if (borderStyle() === 'vignette') drawVignette(octx);
+}
+
+// ==================== Preview ====================
+function ready() {
+  return photos.length >= MIN_BANDS && photos.length <= MAX_BANDS && photos.every(p => p.gradedCanvas);
+}
+
+function refreshPreview() {
+  const tl = buildTimeline();
+  const scrub = document.getElementById('scrub');
+  scrub.max = tl.totalFrames - 1;
+  const fi = Math.min(parseInt(scrub.value, 10) || 0, tl.totalFrames - 1);
+  scrub.value = fi;
+  document.getElementById('scrubVal').textContent = 'frame ' + (fi + 1) + ' / ' + tl.totalFrames;
+  const shape = tl.axis === 'v'
+    ? Math.round(W) + ' x ' + Math.round(tl.bandSpan) + ' rows sliding up'
+    : Math.round(tl.bandSpan) + ' x ' + Math.round(H) + ' columns sliding left';
+  document.getElementById('durNote').textContent =
+    tl.N + ' bands, ' + (tl.cycleFrames / FPS).toFixed(2) + 's cycle played ' + LOOPS + ' times, ' +
+    (tl.totalFrames / FPS).toFixed(2) + 's total, ' + tl.totalFrames + ' frames.';
+  document.getElementById('axisNote').textContent = axisMode === 'auto'
+    ? (photos.length ? 'Auto picked ' + shape + ', from your photos.' : 'Auto follows your photos: tall photos slice into rows, wide photos into columns.')
+    : shape.charAt(0).toUpperCase() + shape.slice(1) + '.';
+  if (ready()) renderFrame(ctx, tl, fi);
+  document.getElementById('canvasWrap').classList.toggle('show', ready());
+  document.getElementById('previewHint').style.display = ready() ? 'none' : 'block';
+  document.getElementById('previewHint').textContent =
+    photos.length < MIN_BANDS
+      ? 'Add ' + (MIN_BANDS - photos.length) + ' more photo' + (MIN_BANDS - photos.length === 1 ? '' : 's') + ' to see the strip.'
+      : '';
+  document.getElementById('exportBtn').disabled = !ready();
+  const ch = document.getElementById('countHint');
+  if (!photos.length) {
+    ch.textContent = 'Add 2 to 4 photos. Each one becomes a band in the strip.';
+  } else if (photos.length < MIN_BANDS) {
+    ch.textContent = '1 photo added. Add at least one more.';
+  } else {
+    ch.textContent = photos.length + ' photos, so ' + photos.length + ' bands.' +
+      (photos.length < MAX_BANDS ? ' Add up to ' + (MAX_BANDS - photos.length) + ' more.' : ' That is the maximum.');
+  }
+}
+
+function stopPlay() {
+  if (playTimer) { clearInterval(playTimer); playTimer = null; }
+  document.getElementById('playBtn').textContent = 'Play loop';
+}
+
+document.getElementById('playBtn').addEventListener('click', () => {
+  if (playTimer) { stopPlay(); return; }
+  const tl = buildTimeline();
+  let fi = parseInt(document.getElementById('scrub').value, 10) || 0;
+  document.getElementById('playBtn').textContent = 'Stop';
+  playTimer = setInterval(() => {
+    fi = (fi + 1) % tl.totalFrames;
+    document.getElementById('scrub').value = fi;
+    document.getElementById('scrubVal').textContent = 'frame ' + (fi + 1) + ' / ' + tl.totalFrames;
+    renderFrame(ctx, tl, fi);
+  }, 1000 / FPS);
+});
+
+document.getElementById('scrub').addEventListener('input', () => { stopPlay(); refreshPreview(); });
+document.getElementById('hold').addEventListener('input', e => {
+  document.getElementById('holdVal').textContent = (parseInt(e.target.value, 10) / 100).toFixed(2).replace(/0$/, '') + 's';
+  stopPlay();
+  document.getElementById('scrub').value = 0;
+  refreshPreview();
+});
+
+// ==================== Photos ====================
+function renderQueue() {
+  const q = document.getElementById('queue');
+  q.innerHTML = '';
+  photos.forEach((p, i) => {
+    const row = document.createElement('div');
+    row.className = 'qrow';
+    const slot = document.createElement('div');
+    slot.className = 'qslot';
+    slot.textContent = String(i + 1);
+    const thumb = document.createElement('canvas');
+    thumb.className = 'qthumb';
+    thumb.width = 108; thumb.height = 60;
+    const tctx = thumb.getContext('2d');
+    const src = p.gradedCanvas || p.baseCanvas;
+    const s = Math.max(108 / src.width, 60 / src.height);
+    tctx.drawImage(src, (108 - src.width * s) / 2, (60 - src.height * s) / 2, src.width * s, src.height * s);
+    const ctl = document.createElement('div');
+    ctl.className = 'qctl';
+    const lbl = document.createElement('label');
+    lbl.className = 'opt-label';
+    lbl.innerHTML = '<span>Framing</span>';
+    const sl = document.createElement('input');
+    sl.type = 'range'; sl.min = 0; sl.max = 100; sl.value = Math.round(p.framing * 100);
+    sl.addEventListener('input', e => {
+      photos[i].framing = parseInt(e.target.value, 10) / 100;
+      stopPlay();
+      refreshPreview();
+    });
+    ctl.appendChild(lbl); ctl.appendChild(sl);
+    const del = document.createElement('button');
+    del.className = 'btn btn-outline';
+    del.type = 'button';
+    del.style.cssText = 'width:auto;margin:0;padding:6px 9px;font-size:10px;';
+    del.textContent = '✕';
+    del.addEventListener('click', () => {
+      photos.splice(i, 1);
+      stopPlay();
+      document.getElementById('scrub').value = 0;
+      renderQueue();
+      refreshPreview();
+    });
+    row.appendChild(slot); row.appendChild(thumb); row.appendChild(ctl); row.appendChild(del);
+    q.appendChild(row);
+  });
+}
+
+function loadFiles(files) {
+  const room = MAX_BANDS - photos.length;
+  const take = Array.from(files).slice(0, Math.max(0, room));
+  if (!take.length) return;
+  let pending = take.length;
+  take.forEach(file => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      // Cap the long edge so grading a big JPEG stays fast.
+      const cap = 2000, s = Math.min(1, cap / Math.max(img.width, img.height));
+      c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      const p = { baseCanvas: c, gradedCanvas: null, framing: 0.5 };
+      p.gradedCanvas = gradeImageData(c);
+      photos.push(p);
+      URL.revokeObjectURL(img.src);
+      if (--pending === 0) { stopPlay(); document.getElementById('scrub').value = 0; renderQueue(); refreshPreview(); }
+    };
+    img.onerror = () => { if (--pending === 0) { stopPlay(); renderQueue(); refreshPreview(); } };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+const dropZone = document.getElementById('dropZone');
+document.getElementById('fileInput').addEventListener('change', e => { loadFiles(e.target.files); e.target.value = ''; });
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  loadFiles(e.dataTransfer.files);
+});
+
+document.querySelectorAll('.count-opt[data-axis]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.count-opt[data-axis]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    axisMode = btn.dataset.axis;
+    stopPlay();
+    document.getElementById('scrub').value = 0;
+    refreshPreview();
+  });
+});
+
+function borderStyle() {
+  const el = document.getElementById('border');
+  return el ? el.value : 'none';
+}
+
+document.getElementById('recipe').addEventListener('change', e => {
+  document.getElementById('recipeDesc').textContent = RECIPE_DESCRIPTIONS[e.target.value] || '';
+  photos.forEach(p => { p.gradedCanvas = gradeImageData(p.baseCanvas); });
+  stopPlay();
+  renderQueue();
+  refreshPreview();
+});
+
+document.getElementById('border').addEventListener('change', () => {
+  stopPlay();
+  refreshPreview();
+});
+
+// ==================== Export ====================
+document.getElementById('exportBtn').addEventListener('click', () => {
+  if (!ready()) return;
+  stopPlay();
+  const tl = buildTimeline();
+  const progressWrap = document.getElementById('progressWrap');
+  const fill = document.getElementById('progressFill');
+  const lbl = document.getElementById('progressLbl');
+  document.getElementById('outputWrap').classList.remove('show');
+  progressWrap.classList.add('show');
+  fill.style.width = '0%';
+  lbl.textContent = 'Starting encoder...';
+
+  const canUseMP4 = typeof VideoEncoder !== 'undefined' && typeof Mp4Muxer !== 'undefined';
+  if (canUseMP4) {
+    buildMP4(tl, progressWrap, fill, lbl).catch(err => {
+      lbl.textContent = 'MP4 failed, trying WebM... (' + err.message + ')';
+      buildWebM(tl, progressWrap, fill, lbl);
+    });
+  } else {
+    buildWebM(tl, progressWrap, fill, lbl);
+  }
+});
+
+async function buildMP4(tl, progressWrap, fill, lbl) {
+  const muxer = new Mp4Muxer.Muxer({
+    target: new Mp4Muxer.ArrayBufferTarget(),
+    video: { codec: 'avc', width: W, height: H },
+    fastStart: 'in-memory'
+  });
+  let encoderError = null;
+  const encoder = new VideoEncoder({
+    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+    error: e => { encoderError = e; lbl.textContent = 'Encoder error: ' + e.message; }
+  });
+  encoder.configure({ codec: 'avc1.4D0028', width: W, height: H, bitrate: 10_000_000, framerate: FPS });
+
+  const off = document.createElement('canvas');
+  off.width = W; off.height = H;
+  const octx = off.getContext('2d');
+
+  for (let fi = 0; fi < tl.totalFrames; fi++) {
+    if (encoderError) throw encoderError;
+    renderFrame(octx, tl, fi);
+    const frame = new VideoFrame(off, {
+      timestamp: Math.round((fi / FPS) * 1_000_000),
+      duration: Math.round((1 / FPS) * 1_000_000)
+    });
+    encoder.encode(frame, { keyFrame: fi % (FPS * 2) === 0 });
+    frame.close();
+    fill.style.width = Math.round((fi / tl.totalFrames) * 100) + '%';
+    lbl.textContent = 'Encoding frame ' + (fi + 1) + '/' + tl.totalFrames;
+    if (fi % 10 === 0) await new Promise(r => setTimeout(r, 0));
+  }
+
+  await encoder.flush();
+  if (encoderError) throw encoderError;
+  muxer.finalize();
+  progressWrap.classList.remove('show');
+  deliver(new Blob([muxer.target.buffer], { type: 'video/mp4' }), 'mp4');
+}
+
+function buildWebM(tl, progressWrap, fill, lbl) {
+  const out = document.createElement('canvas');
+  out.width = W; out.height = H;
+  const octx = out.getContext('2d');
+  const mimeType = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
+    .find(m => MediaRecorder.isTypeSupported(m)) || 'video/webm';
+  const chunks = [];
+  const rec = new MediaRecorder(out.captureStream(FPS), { mimeType, videoBitsPerSecond: 10_000_000 });
+  rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+  rec.onstop = () => {
+    progressWrap.classList.remove('show');
+    deliver(new Blob(chunks, { type: mimeType }), 'webm');
+  };
+  rec.start(100);
+  let fi = 0;
+  (function step() {
+    if (fi >= tl.totalFrames) { rec.stop(); return; }
+    renderFrame(octx, tl, fi);
+    fill.style.width = Math.round((fi / tl.totalFrames) * 100) + '%';
+    lbl.textContent = 'Rendering frame ' + (fi + 1) + '/' + tl.totalFrames;
+    fi++;
+    setTimeout(step, 1000 / FPS);
+  })();
+}
+
+function deliver(blob, ext) {
+  const url = URL.createObjectURL(blob);
+  const vid = document.getElementById('outVideo');
+  const link = document.getElementById('dlLink');
+  vid.src = url;
+  link.href = url;
+  link.download = 'film-strip.' + ext;
+  link.textContent = 'Download .' + ext + ' (' + (blob.size / 1048576).toFixed(1) + ' MB)';
+  document.getElementById('outputWrap').classList.add('show');
+}
+
+// ==================== Init ====================
+document.getElementById('recipeDesc').textContent = RECIPE_DESCRIPTIONS.portra400 || '';
+refreshPreview();
+</script>
+</body>
+</html>

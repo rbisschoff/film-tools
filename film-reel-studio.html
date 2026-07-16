@@ -2,234 +2,70 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Fuji Film Reel Studio</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fuji Film Recipe Studio</title>
 <script src="https://cdn.jsdelivr.net/npm/mp4-muxer@4.3.3/build/mp4-muxer.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-  :root {
-    --accent: #007AFF;
-    --accent-dark: #0051D5;
-    --accent-light: rgba(0, 122, 255, 0.12);
-    --positive: #34C759;
-    --alert: #FF3B30;
-    --ink: #1C1C1E;
-    --ink2: #3A3A3C;
-    --muted: #8E8E93;
-    --muted2: #AEAEB2;
-    --bg: #F2F2F7;
-    --card: #FFFFFF;
-    --card2: #F9F9FB;
-    --border: rgba(60, 60, 67, 0.12);
-    --radius-lg: 20px;
-    --radius-md: 16px;
-    --radius-sm: 12px;
-    --shadow-card: 0 2px 16px rgba(0,0,0,0.06);
-  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html { -webkit-text-size-adjust: 100%; }
-  body {
-    font-family: -apple-system, 'Inter', BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: var(--bg);
-    color: var(--ink);
-    min-height: 100vh;
-    -webkit-font-smoothing: antialiased;
-    overflow-x: clip;
-    padding: 0;
-  }
-  header {
-    background: rgba(8,8,14,0.96);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    position: sticky;
-    top: 0;
-    z-index: 200;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-  }
-  .header-inner {
-    max-width: 680px;
-    margin: 0 auto;
-    padding: 10px 16px;
-    padding-top: calc(10px + env(safe-area-inset-top));
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-  }
-  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
-  .brand-mark {
-    width: 30px; height: 30px; background: var(--accent); border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    color: #fff; font-weight: 700; font-size: 13px; flex-shrink: 0;
-    box-shadow: 0 2px 10px rgba(0, 122, 255, 0.35);
-  }
-  .brand-text { min-width: 0; }
-  .brand-title { color: #fff; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .brand-sub { color: rgba(255,255,255,0.4); font-size: 11px; margin-top: 1px; }
-  .header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-  .header-link {
-    color: #fff; font-size: 12px; font-weight: 500;
-    padding: 8px 10px; border-radius: 8px; min-height: 36px;
-    display: inline-flex; align-items: center;
-    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
-    text-decoration: none;
-  }
-  .lang-switch {
-    display: flex; align-items: center; gap: 4px;
-    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 100px; padding: 3px;
-  }
-  .lang-opt {
-    font-family: inherit; font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
-    color: rgba(255,255,255,0.55); background: transparent; border: none;
-    border-radius: 100px; padding: 8px 10px; min-height: 36px; cursor: pointer;
-  }
-  .lang-opt.active { background: rgba(255,255,255,0.16); color: #fff; }
+  body { background: #f5f0ea; color: #2a2118; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; min-height: 100vh; padding: 20px 16px 60px; }
+  h1 { font-size: 12px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: #a8967c; margin-bottom: 24px; }
+  h1 span { color: #2a2118; }
+  .card { background: #fdfaf6; border: 1px solid #e8e0d4; border-radius: 12px; padding: 18px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(60,40,10,0.06); }
+  .card-title { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #b0987a; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .step-num { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #e8f4ee; color: #2e8c5a; font-size: 9px; font-weight: 700; flex-shrink: 0; }
+  .hint { font-size: 11px; color: #8a7560; line-height: 1.6; margin-bottom: 12px; }
 
-  .wrap {
-    max-width: 680px;
-    margin: 0 auto;
-    padding: 16px 16px calc(48px + env(safe-area-inset-bottom));
-  }
-
-  .card {
-    background: var(--card);
-    border: none;
-    border-radius: var(--radius-md);
-    padding: 18px 16px;
-    margin-bottom: 12px;
-    box-shadow: var(--shadow-card);
-  }
-  .card-title {
-    font-size: 13px; font-weight: 700; letter-spacing: -0.01em;
-    color: var(--ink); margin-bottom: 10px;
-    display: flex; align-items: center; gap: 8px;
-  }
-  .step-num {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 22px; height: 22px; border-radius: 50%;
-    background: var(--accent-light); color: var(--accent);
-    font-size: 11px; font-weight: 700; flex-shrink: 0;
-  }
-  .hint { font-size: 13px; color: var(--muted); line-height: 1.55; margin-bottom: 12px; }
-
-  .drop-zone {
-    border: 1.5px dashed var(--border); border-radius: var(--radius-sm);
-    padding: 28px 16px; text-align: center; cursor: pointer;
-    transition: border-color 0.2s, background 0.2s;
-    position: relative; background: var(--card2); min-height: 100px;
-  }
-  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: var(--accent-light); }
+  .drop-zone { border: 1.5px dashed #d4c8b8; border-radius: 8px; padding: 28px 16px; text-align: center; cursor: pointer; transition: border-color 0.2s; position: relative; background: #faf6f0; }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: #2e8c5a; }
   .drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
   .drop-icon { font-size: 24px; margin-bottom: 6px; }
-  .drop-label { font-size: 13px; color: var(--muted); }
-  .drop-label strong { color: var(--ink2); }
+  .drop-label { font-size: 12px; color: #b0987a; }
+  .drop-label strong { color: #5c4a32; }
 
-  select, input[type=range], input[type=text] {
-    width: 100%; background: var(--card2); border: 1px solid var(--border);
-    border-radius: 10px; color: var(--ink); font-size: 16px;
-    padding: 12px 12px; outline: none; appearance: none; -webkit-appearance: none;
-    font-family: inherit; min-height: 44px;
-  }
-  input[type=range] { padding: 0; min-height: 32px; background: transparent; border: none; }
-  input[type=text]::placeholder { color: var(--muted2); }
-  .opt-label {
-    font-size: 11px; color: var(--muted); margin: 12px 0 6px;
-    letter-spacing: 0.06em; text-transform: uppercase; display: block; font-weight: 600;
-  }
-  .row-val { font-size: 12px; color: var(--accent); font-weight: 600; }
+  select, input[type=range] { width: 100%; background: #faf6f0; border: 1px solid #d4c8b8; border-radius: 6px; color: #2a2118; font-size: 12px; padding: 8px 10px; outline: none; appearance: none; -webkit-appearance: none; }
+  input[type=text] { width: 100%; background: #faf6f0; border: 1px solid #d4c8b8; border-radius: 6px; color: #2a2118; font-size: 12px; padding: 8px 10px; outline: none; }
+  input[type=text]::placeholder { color: #b0987a; }
+  .opt-label { font-size: 10px; color: #a8967c; margin: 10px 0 5px; letter-spacing: 0.08em; text-transform: uppercase; display: block; }
+  .row-val { font-size: 11px; color: #2e8c5a; font-weight: 600; }
 
-  .btn {
-    width: 100%; padding: 14px; border-radius: var(--radius-sm); border: none;
-    font-size: 14px; font-weight: 700; letter-spacing: 0.02em;
-    cursor: pointer; transition: background 0.15s, opacity 0.2s; margin-top: 8px;
-    font-family: inherit; min-height: 48px; -webkit-tap-highlight-color: transparent;
-  }
-  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
-  .btn-green { background: var(--accent); color: #fff; }
-  .btn-green:not(:disabled):hover { background: var(--accent-dark); }
-  .btn-outline { background: var(--card2); border: 1px solid var(--border); color: var(--ink2); }
-  .btn-outline:not(:disabled):hover { border-color: var(--accent); color: var(--accent); }
-  .dur-opt {
-    flex: 1; padding: 12px 0; border-radius: 10px; border: 1px solid var(--border);
-    background: var(--card2); color: var(--ink2); font-size: 13px; font-weight: 600;
-    cursor: pointer; transition: all 0.15s; min-height: 44px; font-family: inherit;
-  }
-  .dur-opt:hover { border-color: var(--muted2); }
-  .dur-opt.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn { width: 100%; padding: 12px; border-radius: 8px; border: none; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: opacity 0.2s; margin-top: 8px; }
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .btn-green { background: #2e8c5a; color: #fff; padding: 14px; font-size: 13px; }
+  .btn-green:not(:disabled):hover { opacity: 0.85; }
+  .btn-outline { background: #faf6f0; border: 1px solid #d4c8b8; color: #6b5540; }
+  .dur-opt { flex:1; padding:9px 0; border-radius:6px; border:1px solid #d4c8b8; background:#faf6f0; color:#6b5540; font-size:12px; font-weight:600; cursor:pointer; transition:all 0.15s; }
+  .dur-opt:hover { border-color:#a8967c; }
+  .dur-opt.active { background:#2e8c5a; border-color:#2e8c5a; color:#fff; }
+  .btn-outline:not(:disabled):hover { border-color: #a8967c; color: #2a2118; }
 
   .canvas-wrap { position: relative; margin-top: 12px; display: none; }
   .canvas-wrap.show { display: block; }
-  canvas { width: 100%; border-radius: var(--radius-sm); display: block; background: #E5E5EA; cursor: crosshair; }
-  .anchor-dot {
-    position: absolute; width: 16px; height: 16px; border-radius: 50%;
-    border: 2px solid var(--accent); background: rgba(0,122,255,0.2);
-    transform: translate(-50%,-50%); pointer-events: none;
-  }
-  .note { font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  canvas { width: 100%; border-radius: 8px; display: block; background: #e8e0d4; cursor: crosshair; }
+  .anchor-dot { position: absolute; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #2e8c5a; background: rgba(46,140,90,0.2); transform: translate(-50%,-50%); pointer-events: none; }
+  .note { font-size: 10px; color: #b0987a; margin-top: 8px; line-height: 1.5; }
 
   .progress-wrap { display: none; margin-top: 12px; }
   .progress-wrap.show { display: block; }
-  .progress-bg { background: rgba(0,0,0,0.08); border-radius: 3px; height: 4px; overflow: hidden; margin-bottom: 6px; }
-  .progress-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.2s; width: 0%; }
-  .progress-lbl { font-size: 12px; color: var(--muted); }
+  .progress-bg { background: #e8e0d4; border-radius: 3px; height: 3px; overflow: hidden; margin-bottom: 6px; }
+  .progress-fill { height: 100%; background: #2e8c5a; border-radius: 3px; transition: width 0.2s; width: 0%; }
+  .progress-lbl { font-size: 10px; color: #a8967c; }
 
   .output-wrap { display: none; margin-top: 14px; }
   .output-wrap.show { display: block; }
-  .preview-video { width: 100%; border-radius: var(--radius-sm); max-height: 420px; object-fit: contain; background: #1C1C1E; display: block; }
-  .dl-link {
-    display: block; text-align: center; margin-top: 10px; text-decoration: none;
-    padding: 14px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 700;
-    background: var(--accent); color: #fff; min-height: 48px;
-  }
-
-  .toggle-row {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 0; border-bottom: 1px solid var(--border); gap: 12px;
-  }
-  .toggle-row span { font-size: 14px; color: var(--ink2); }
-  input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); }
-
-  #recipeModalOverlay { align-items: flex-end; justify-content: center; }
-  #recipeModalList {
-    background: var(--card) !important;
-    border-radius: 20px 20px 0 0 !important;
-    width: 100%; max-width: 600px; overflow: hidden;
-    max-height: min(80vh, 640px); overflow-y: auto;
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-
-  @media (max-width: 480px) {
-    .brand-sub { display: none; }
-    .header-link { display: none; }
-    .wrap { padding: 12px 12px calc(40px + env(safe-area-inset-bottom)); }
-    .card { padding: 16px 14px; }
-  }
+  .preview-video { width: 100%; border-radius: 8px; max-height: 420px; object-fit: contain; background: #2a2118; display: block; }
+  .dl-link { display: block; text-align: center; margin-top: 10px; text-decoration: none; padding: 13px; border-radius: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; background: #2e8c5a; color: #fff; }
 </style>
 </head>
 <body>
 
-<header>
-  <div class="header-inner">
-    <div class="brand">
-      <div class="brand-mark">フ</div>
-      <div class="brand-text">
-        <div class="brand-title"><span data-i18n="appTitlePre">Fuji / </span><span data-i18n="appTitle">Film Reel Studio</span></div>
-        <div class="brand-sub">Photo grading &amp; reels</div>
-      </div>
-    </div>
-    <div class="header-actions">
-      <div class="lang-switch" id="langToggle" role="group" aria-label="Language">
-        <button type="button" class="lang-opt active" data-lang="en">EN</button>
-        <button type="button" class="lang-opt" data-lang="it">IT</button>
-      </div>
-      <a href="index.html" class="header-link">All tools</a>
-    </div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+  <h1 style="margin:0"><span data-i18n="appTitlePre">Fuji / </span><span data-i18n="appTitle">Film Reel Studio</span></h1>
+  <div id="langToggle" style="display:flex;gap:4px;flex-shrink:0">
+    <button type="button" class="lang-opt active" data-lang="en" style="padding:5px 10px;border-radius:6px;border:1px solid #d4c8b8;background:#2e8c5a;color:#fff;font-size:11px;font-weight:700;cursor:pointer">EN</button>
+    <button type="button" class="lang-opt" data-lang="it" style="padding:5px 10px;border-radius:6px;border:1px solid #d4c8b8;background:#faf6f0;color:#6b5540;font-size:11px;font-weight:700;cursor:pointer">IT</button>
   </div>
-</header>
-
-<div class="wrap">
+</div>
 
 <!-- STEP 1: UPLOAD -->
 <div class="card">
@@ -257,6 +93,8 @@
     <option value="portra400">Kodak Portra 400</option>
     <option value="gold200">Kodak Gold 200</option>
     <option value="trix400">Kodak Tri-X 400 (B&W)</option>
+    <option value="ultramax400">Kodak Ultramax 400</option>
+    <option value="kodachrome64">Kodachrome 64</option>
   </select>
 
   <label class="opt-label"><span data-i18n="strengthLbl">Recipe strength</span> <span class="row-val" id="strengthVal">100%</span></label>
@@ -289,17 +127,17 @@
   <button class="btn btn-outline" id="exportJpgBtn" data-i18n="exportJpgBtn" disabled>Export still (JPG)</button>
 
   <button class="btn btn-outline" id="stackJpgBtn" data-i18n="stackBtn" disabled>Export stacked panel (JPG)</button>
-  <p class="hint" id="stackHint" style="margin-top:6px;margin-bottom:0;color:var(--muted)"><span data-i18n="stackHint">Stacks all graded photos in the queue vertically into one image, top to bottom in queue order. Add 2 or more photos and apply the recipe first.</span></p>
+  <p class="hint" id="stackHint" style="margin-top:6px;margin-bottom:0;color:#8a7560"><span data-i18n="stackHint">Stacks all graded photos in the queue vertically into one image, top to bottom in queue order. Add 2 or more photos and apply the recipe first.</span></p>
 
   <label class="opt-label" style="margin-top:12px"><span data-i18n="gapLbl">Gap between panels</span> <span class="row-val" id="stackGapVal">0px</span></label>
   <input type="range" id="stackGap" min="0" max="60" value="0">
 
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);margin-top:4px">
-    <span style="font-size:12px;color:var(--ink2);">Match panel widths</span>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;margin-top:4px">
+    <span style="font-size:12px;color:#5c4a32;">Match panel widths</span>
     <input type="checkbox" id="stackMatchWidth" checked>
   </div>
 
-  <button class="btn btn-outline" id="surpriseBtn" data-i18n="surpriseBtn" style="border-color:var(--accent);color:var(--accent)">🎲 Surprise me</button>
+  <button class="btn btn-outline" id="surpriseBtn" data-i18n="surpriseBtn" style="border-color:#2e8c5a;color:#2e8c5a">🎲 Surprise me</button>
 
   <label class="opt-label"><span data-i18n="durLbl">Zoom duration per photo</span> <span class="row-val" id="durVal">1s</span></label>
   <div id="durationOpts" style="display:flex;gap:6px;margin-top:2px">
@@ -309,7 +147,7 @@
     <button type="button" class="dur-opt" data-val="2.5">2.5s</button>
   </div>
   <input type="hidden" id="duration" value="1">
-  <p class="hint" id="totalDurHint" style="margin-top:4px;margin-bottom:0;color:var(--muted)"><span data-i18n="actualReel">Actual reel:</span> <strong id="totalDurVal">—</strong></p>
+  <p class="hint" id="totalDurHint" style="margin-top:4px;margin-bottom:0;color:#8a7560"><span data-i18n="actualReel">Actual reel:</span> <strong id="totalDurVal">—</strong></p>
 
   <label class="opt-label"><span data-i18n="zoomLbl">Zoom amount</span> <span class="row-val" id="zoomVal">15%</span></label>
   <input type="range" id="zoomAmt" min="5" max="40" value="15">
@@ -341,16 +179,39 @@
     <option value="bt" data-i18n="moveBT">Zoom + pan bottom → top</option>
   </select>
 
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);">
-    <span style="font-size:12px;color:var(--ink2);" data-i18n="dust">Dust & scratches</span>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
+    <span style="font-size:12px;color:#5c4a32;" data-i18n="dust">Dust & scratches</span>
     <input type="checkbox" id="dustToggle" checked>
   </div>
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);">
-    <span style="font-size:12px;color:var(--ink2);" data-i18n="leak">Light leak</span>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
+    <span style="font-size:12px;color:#5c4a32;" data-i18n="leak">Light leak</span>
     <input type="checkbox" id="leakToggle" checked>
   </div>
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);">
-    <span style="font-size:12px;color:var(--ink2);" data-i18n="coverCardLbl">Film memory cover card (end of reel)</span>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
+    <span style="font-size:12px;color:#5c4a32;" data-i18n="weave">Gate weave &amp; flicker</span>
+    <input type="checkbox" id="weaveToggle" checked>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
+    <span style="font-size:12px;color:#5c4a32;" data-i18n="halation">Halation glow</span>
+    <input type="checkbox" id="halationToggle" checked>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
+    <span style="font-size:12px;color:#5c4a32;" data-i18n="parallax">Parallax depth (experimental)</span>
+    <input type="checkbox" id="parallaxToggle">
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
+    <span style="font-size:12px;color:#5c4a32;" data-i18n="recipeLabel">Show recipe label in video</span>
+    <input type="checkbox" id="recipeLabelToggle" checked>
+  </div>
+  <button id="surpriseBtn" type="button" style="width:100%;margin:12px 0 4px;padding:11px 14px;border:none;border-radius:10px;background:#5c4a32;color:#f5efe4;font-size:13px;font-weight:600;letter-spacing:.3px;cursor:pointer;">✦ <span data-i18n="surprise">Surprise me</span></button>
+  <p class="hint" style="margin-top:2px;margin-bottom:0;color:#8a7560"><span data-i18n="surpriseHint">Rolls a random film stock, motion, frame and effect mix. Happy accidents, the way film always was.</span></p>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
+    <span style="font-size:12px;color:#5c4a32;" data-i18n="revealLbl">Before / after reveal intro</span>
+    <input type="checkbox" id="revealToggle">
+  </div>
+  <p class="hint" id="revealHint" style="margin-top:6px;margin-bottom:0;color:#8a7560"><span data-i18n="revealHintTxt">Opens the reel on the raw photo, then wipes the film look across it and names the recipe. This is the "how did you make that?" hook for Instagram. Uses the first photo in the queue.</span></p>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
+    <span style="font-size:12px;color:#5c4a32;" data-i18n="coverCardLbl">Film memory cover card (end of reel)</span>
   </div>
   <input type="text" id="coverLabel" data-i18n-ph="coverPh" placeholder="Type a cover label to add an end card — leave empty to skip it" style="margin-top:8px">
 
@@ -360,18 +221,18 @@
   <label class="opt-label" id="scrubLabel" style="display:none">Preview scrub <span class="row-val" id="scrubVal">0:00</span></label>
   <input type="range" id="scrubBar" min="0" max="1000" value="0" style="display:none">
 
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);">
-    <span style="font-size:12px;color:var(--ink2);" data-i18n="watermark">Watermark</span>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
+    <span style="font-size:12px;color:#5c4a32;" data-i18n="watermark">Watermark</span>
     <input type="checkbox" id="wmToggle">
   </div>
   <input type="text" id="wmText" data-i18n-ph="wmPh" placeholder="@yourhandle or your website" style="margin-top:8px;display:none">
 
   <label class="opt-label" style="margin-top:14px" data-i18n="formatLbl">Export format</label>
   <div style="display:flex;gap:12px;margin-top:4px">
-    <label style="font-size:12px;color:var(--ink2);display:flex;align-items:center;gap:6px;cursor:pointer">
+    <label style="font-size:12px;color:#5c4a32;display:flex;align-items:center;gap:6px;cursor:pointer">
       <input type="radio" name="exportFormat" id="fmtMp4" value="mp4" checked> <span data-i18n="fmtMp4">MP4 (Instagram)</span>
     </label>
-    <label style="font-size:12px;color:var(--ink2);display:flex;align-items:center;gap:6px;cursor:pointer">
+    <label style="font-size:12px;color:#5c4a32;display:flex;align-items:center;gap:6px;cursor:pointer">
       <input type="radio" name="exportFormat" id="fmtGif" value="gif"> <span data-i18n="fmtGif">GIF (Reddit)</span>
     </label>
   </div>
@@ -385,9 +246,9 @@
 
   <div class="output-wrap" id="outputWrap"></div>
 
-  <div id="markersWrap" style="display:none;margin-top:14px;background:var(--accent-light);border:1px solid var(--border);border-radius:12px;padding:12px;">
-    <div style="font-size:11px;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px;font-weight:600;" data-i18n="markersTitle">Music timing markers</div>
-    <div id="markersList" style="font-size:12px;color:var(--ink2);line-height:1.9;"></div>
+  <div id="markersWrap" style="display:none;margin-top:14px;background:#f0ebe3;border:1px solid #e0d6c8;border-radius:8px;padding:12px;">
+    <div style="font-size:10px;color:#a8967c;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;" data-i18n="markersTitle">Music timing markers</div>
+    <div id="markersList" style="font-size:11px;color:#6b5540;line-height:1.9;"></div>
     <p class="note"><span data-i18n="markersNote">Use these timestamps to line up a beat drop or transition in CapCut when adding music.</span></p>
   </div>
 </div>
@@ -399,19 +260,26 @@
   <a class="dl-link" id="coverDl" download="film-memory-cover.jpg" data-i18n="coverDl">Download cover image</a>
 </div>
 
+<!-- INSTAGRAM CAPTION -->
+<div class="card">
+  <div class="card-title"><span class="step-num">✎</span> <span data-i18n="capTitle">Instagram caption</span></div>
+  <p class="hint" data-i18n="capHint">Writes a caption and hashtags from the film recipe and border you selected. Tap again for a different version.</p>
+  <button class="btn btn-outline" id="genCaptionBtn" data-i18n="capGen" style="border-color:#2e8c5a;color:#2e8c5a">✨ Generate caption</button>
+  <textarea id="captionOut" readonly rows="9" style="display:none;width:100%;margin-top:10px;background:#faf6f0;border:1px solid #d4c8b8;border-radius:8px;color:#2a2118;font-size:12.5px;line-height:1.6;padding:12px;resize:vertical;font-family:inherit"></textarea>
+  <button class="btn btn-outline" id="copyCaptionBtn" data-i18n="capCopy" style="display:none">Copy caption</button>
+</div>
+
 <!-- DIAGNOSTICS PANEL -->
 <div class="card" style="margin-top:24px">
   <div class="card-title" id="diagToggle" style="cursor:pointer;user-select:none">
     <span class="step-num">✓</span> <span data-i18n="diagTitle">Diagnostics</span>
-    <span style="color:var(--muted);margin-left:auto;font-size:10px;font-weight:600">TAP TO RUN</span>
+    <span style="color:#b0987a;margin-left:auto;font-size:9px">TAP TO RUN</span>
   </div>
   <div id="diagBody" style="display:none">
-    <button class="btn btn-outline" id="runDiagBtn" style="margin-bottom:12px;"><span data-i18n="runDiag">▶ Run all checks</span></button>
+    <button class="btn btn-outline" id="runDiagBtn" style="margin-bottom:12px;background:#faf6f0;border:1px solid #d4c8b8;color:#6b5540;"><span data-i18n="runDiag">▶ Run all checks</span></button>
     <div id="diagResults" style="font-size:11px;line-height:2;"></div>
   </div>
 </div>
-
-</div><!-- /.wrap -->
 
 <script>
 // ==================== i18n ====================
@@ -439,6 +307,15 @@ const I18N = {
     moveLR:"Zoom + pan left → right", moveRL:"Zoom + pan right → left",
     moveTB:"Zoom + pan top → bottom", moveBT:"Zoom + pan bottom → top",
     dust:"Dust & scratches", leak:"Light leak",
+    weave:"Gate weave & flicker", halation:"Halation glow", parallax:"Parallax depth (experimental)",
+    surprise:"Surprise me", surpriseHint:"Rolls a random film stock, motion, frame and effect mix. Happy accidents, the way film always was.",
+    recipeLabel:"Show recipe label in video",
+    revealLbl:"Before / after reveal intro",
+    revealOriginal:"Original",
+    capTitle:"Instagram caption",
+    capHint:"Writes a caption and hashtags from the film recipe and border you selected. Tap again for a different version.",
+    capGen:"✨ Generate caption", capCopy:"Copy caption", capCopied:"Copied ✓",
+    revealHintTxt:"Opens the reel on the raw photo, then wipes the film look across it and names the recipe. This is the \"how did you make that?\" hook for Instagram. Uses the first photo in the queue.",
     coverCardLbl:"Film memory cover card (end of reel)",
     coverPh:"Type a cover label to add an end card — leave empty to skip it",
     watermark:"Watermark", wmPh:"@yourhandle or your website",
@@ -479,6 +356,15 @@ const I18N = {
     moveLR:"Zoom + panoramica sinistra → destra", moveRL:"Zoom + panoramica destra → sinistra",
     moveTB:"Zoom + panoramica alto → basso", moveBT:"Zoom + panoramica basso → alto",
     dust:"Polvere e graffi", leak:"Fuga di luce",
+    weave:"Oscillazione & sfarfallio", halation:"Alone luminoso", parallax:"Profondità parallasse (sperimentale)",
+    surprise:"Sorprendimi", surpriseHint:"Sceglie a caso pellicola, movimento, cornice ed effetti. Piccoli incidenti felici, come voleva la pellicola.",
+    recipeLabel:"Mostra etichetta pellicola nel video",
+    revealLbl:"Intro prima / dopo",
+    revealOriginal:"Originale",
+    capTitle:"Didascalia Instagram",
+    capHint:"Crea una didascalia e degli hashtag dalla ricetta pellicola e dal bordo scelti. Tocca di nuovo per una versione diversa.",
+    capGen:"✨ Genera didascalia", capCopy:"Copia didascalia", capCopied:"Copiato ✓",
+    revealHintTxt:"Apre il reel sulla foto originale, poi fa scorrere l'effetto pellicola e mostra il nome della ricetta. È il gancio \"come l'hai fatto?\" per Instagram. Usa la prima foto della coda.",
     coverCardLbl:"Cartolina ricordo (fine del reel)",
     coverPh:"Scrivi un titolo per aggiungere una cartolina finale — lascia vuoto per saltarla",
     watermark:"Filigrana", wmPh:"@iltuonome o il tuo sito",
@@ -514,9 +400,10 @@ function applyLanguage(lang){
   try { if (typeof updateTotalDuration === 'function') updateTotalDuration(); } catch(e){}
   // toggle button active state
   document.querySelectorAll('.lang-opt').forEach(b=>{
-    b.classList.toggle('active', b.dataset.lang === LANG);
-    b.style.background = '';
-    b.style.color = '';
+    const on = b.dataset.lang === LANG;
+    b.classList.toggle('active', on);
+    b.style.background = on ? '#2e8c5a' : '#faf6f0';
+    b.style.color = on ? '#fff' : '#6b5540';
   });
 }
 document.querySelectorAll('.lang-opt').forEach(btn=>{
@@ -552,8 +439,8 @@ function setStatus(msg, color) {
     document.getElementById('photoQueue').parentNode.insertBefore(el, document.getElementById('photoQueue'));
   }
   el.textContent = msg;
-  el.style.background = color === 'ok' ? 'var(--accent-light)' : color === 'err' ? '#fde8e8' : 'var(--card2)';
-  el.style.color = color === 'ok' ? '#007AFF' : color === 'err' ? '#c0392b' : '#6b5540';
+  el.style.background = color === 'ok' ? '#e8f4ee' : color === 'err' ? '#fde8e8' : '#f0ebe3';
+  el.style.color = color === 'ok' ? '#2e8c5a' : color === 'err' ? '#c0392b' : '#6b5540';
 }
 
 function loadFiles(files) {
@@ -654,10 +541,10 @@ function renderQueue() {
     <div style="font-size:10px;color:#a8967c;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">${photoQueue.length} ${photoQueue.length>1?t('photos'):t('photo')} — ${t('tapPreview')}</div>
     <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">
       ${photoQueue.map((p, i) => `
-        <div style="flex-shrink:0;position:relative;border:2px solid ${p.id===activePhotoId?'#007AFF':'#AEAEB2'};border-radius:6px;overflow:hidden;cursor:pointer" data-id="${p.id}" class="queue-thumb">
+        <div style="flex-shrink:0;position:relative;border:2px solid ${p.id===activePhotoId?'#2e8c5a':'#d4c8b8'};border-radius:6px;overflow:hidden;cursor:pointer" data-id="${p.id}" class="queue-thumb">
           <img src="${p.thumbDataUrl}" style="display:block;width:80px;height:100px;object-fit:cover">
           <div style="position:absolute;top:2px;left:3px;font-size:9px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.8)">${i+1}</div>
-          ${p.gradedCanvas ? '<div style="position:absolute;top:2px;right:3px;font-size:9px;color:#007AFF;font-weight:700">✓</div>' : ''}
+          ${p.gradedCanvas ? '<div style="position:absolute;top:2px;right:3px;font-size:9px;color:#2e8c5a;font-weight:700">✓</div>' : ''}
           <div style="position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:space-between;background:rgba(60,40,10,0.5);padding:2px 3px">
             ${i > 0 ? `<span class="q-btn" data-action="left" data-id="${p.id}" style="color:#e8e0d4;font-size:11px;cursor:pointer;padding:1px 4px">◀</span>` : '<span></span>'}
             <span class="q-btn" data-action="del" data-id="${p.id}" style="color:#f08080;font-size:11px;cursor:pointer;padding:1px 4px">✕</span>
@@ -666,7 +553,7 @@ function renderQueue() {
         </div>
       `).join('')}
       ${photoQueue.length < MAX_PHOTOS ? `
-        <div style="flex-shrink:0;width:80px;height:100px;border:1.5px dashed #AEAEB2;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#b0987a;font-size:22px" id="addMoreBtn">+</div>
+        <div style="flex-shrink:0;width:80px;height:100px;border:1.5px dashed #d4c8b8;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#b0987a;font-size:22px" id="addMoreBtn">+</div>
       ` : ''}
     </div>
   `;
@@ -699,7 +586,8 @@ function updateTotalDuration() {
   const zoomSec = parseFloat(document.getElementById('duration').value) || 1;
   const n = Math.max(1, photoQueue.length);
   const coverLabel = document.getElementById('coverLabel')?.value?.trim() || '';
-  const totalSec = (n * zoomSec) + ((n - 1) * 1.5) + (coverLabel ? 3.2 : 0);
+  const revealSec = document.getElementById('revealToggle')?.checked ? 2.3 : 0;
+  const totalSec = revealSec + (n * zoomSec) + ((n - 1) * 1.5) + (coverLabel ? 3.2 : 0);
   const el = document.getElementById('totalDurVal');
   if (el) el.textContent = totalSec.toFixed(1) + t('secShort') + (n > 1 ? ` (${n} ${t('photos')})` : '');
 }
@@ -855,7 +743,20 @@ function buildRecipeLUT(def) {
       b = l + (b - l) * (1 + s);
     }
 
-    // 7. back to sRGB
+    // 7. base fog. Colour negative film carries an orange mask, so no channel
+    // ever reaches zero. This must sit AFTER saturation: saturation pushes the
+    // channels apart and would otherwise crush the low one to black, which is
+    // what shadowColor at step 5 was trying and failing to prevent. Clamp
+    // first, because saturation can drive a channel below zero and a lift on
+    // its own would leave it there.
+    if (def.floor) {
+      const f = def.floor;
+      r = f + (r < 0 ? 0 : r) * (1 - f);
+      g = f + (g < 0 ? 0 : g) * (1 - f);
+      b = f + (b < 0 ? 0 : b) * (1 - f);
+    }
+
+    // 8. back to sRGB
     return [
       clamp(linearToSrgb(r)),
       clamp(linearToSrgb(g)),
@@ -898,17 +799,53 @@ const RECIPE_DEFS = {
   },
 
   trix400: {
-    // Kodak Tri-X 400 — classic high-contrast B&W.
-    // Strong S-curve, punchy blacks, slight warm highlight tint.
+    // Kodak Tri-X 400 — classic high-contrast B&W, warm-toned print.
+    // The S-curve pivots on linear 0.216, which is sRGB mid-grey, so mid-grey
+    // renders as mid-grey (box speed). Pivoting on linear 0.5 instead put the
+    // hinge up at sRGB 188 and dragged the midtones a third of a stop down,
+    // which read as pushed film rather than Tri-X at 400.
     curveR: [[0,0],[0.2,0.14],[0.5,0.52],[0.8,0.90],[1,1]],
     curveG: [[0,0],[0.2,0.14],[0.5,0.52],[0.8,0.90],[1,1]],
     curveB: [[0,0],[0.2,0.14],[0.5,0.52],[0.8,0.90],[1,1]],
-    curveLum: [[0,0],[0.18,0.10],[0.5,0.52],[0.82,0.93],[1,1]],
+    curveLum: [[0,0],[0.088,0.038],[0.216,0.216],[0.51,0.652],[1,1]],
     matrix: null,
     shadowColor: [0,0,0], shadowStr: 0,
-    highlightColor: [1.0,0.98,0.94], highlightStr: 0.18,
+    highlightColor: [1.0,0.96,0.87], highlightStr: 1.0,
     saturation: -1.0,
     bw: true
+  },
+
+  ultramax400: {
+    // Kodak Ultramax 400 — punchy consumer negative film.
+    // Warmer than Portra but less golden than Gold; higher contrast and
+    // stronger saturation. Vivid reds and greens, healthy warm skin.
+    curveR: [[0,0.015],[0.25,0.28],[0.5,0.55],[0.75,0.815],[1,1.0]],
+    curveG: [[0,0.012],[0.25,0.265],[0.5,0.53],[0.75,0.785],[1,0.985]],
+    curveB: [[0,0.02],[0.25,0.245],[0.5,0.49],[0.75,0.74],[1,0.945]],
+    curveLum: [[0,0.0],[0.2,0.178],[0.5,0.520],[0.8,0.872],[1,1.0]],
+    matrix: [1.06,-0.03,-0.03, -0.02,1.05,-0.03, -0.02,-0.02,1.05],
+    shadowColor: [0.08,0.08,0.10], shadowStr: 0.06,
+    highlightColor: [1.0,0.96,0.88], highlightStr: 0.12,
+    // Base fog, because this is a colour negative like Gold and negatives are
+    // defined by their shadow latitude. Without it, saturation crushed a
+    // channel on a quarter of all colours and the blacks sat at slide-film
+    // density. Saturation is nudged up to pay back what the fog costs.
+    saturation: 0.19,
+    floor: 0.009
+  },
+
+  kodachrome64: {
+    // Kodachrome 64 — the iconic slide film.
+    // Dense, un-lifted blacks, high micro-contrast, famously deep reds and
+    // restrained, slightly cyan blues. Rich rather than bright.
+    curveR: [[0,0.0],[0.25,0.27],[0.5,0.55],[0.75,0.82],[1,1.0]],
+    curveG: [[0,0.0],[0.22,0.20],[0.5,0.50],[0.78,0.80],[1,0.985]],
+    curveB: [[0,0.0],[0.25,0.22],[0.5,0.46],[0.75,0.72],[1,0.93]],
+    curveLum: [[0,0.0],[0.18,0.11],[0.5,0.51],[0.82,0.90],[1,1.0]],
+    matrix: [1.08,-0.05,-0.03, -0.04,1.04,-0.02, -0.03,-0.05,1.08],
+    shadowColor: [0.05,0.05,0.08], shadowStr: 0.10,
+    highlightColor: [1.0,0.95,0.85], highlightStr: 0.10,
+    saturation: 0.08
   }
 };
 
@@ -924,13 +861,20 @@ for (const [key, def] of Object.entries(RECIPE_DEFS)) {
     const hStr = def.highlightStr || 0;
     RECIPES[key] = (r0, g0, b0) => {
       const lum = 0.2126 * lumIn[r0] + 0.7152 * lumIn[g0] + 0.0722 * lumIn[b0];
-      let v = lCurve[Math.round(lum * 255)];
-      // Slight warm highlight tint
-      const hw = Math.max(0, v * 2 - 1) * hStr;
-      const rv = v + (hColor[0] - v) * hw;
-      const gv = v + (hColor[1] - v) * hw;
-      const bv = v + (hColor[2] - v) * hw;
-      return [clamp(linearToSrgb(rv)), clamp(linearToSrgb(gv)), clamp(linearToSrgb(bv))];
+      const v = lCurve[Math.round(lum * 255)];
+      // Warm tone, the way a warm-toned print actually behaves: neutral in the
+      // deep shadows, warming steadily up through the midtones into the
+      // highlights. Two fixes over the old version. The weight now ramps from
+      // low down instead of gating above linear 0.5, which is sRGB 188 and left
+      // everything but the brightest sliver untouched. And the tint multiplies
+      // rather than lerping toward a bright colour, so it shifts hue without
+      // also lifting exposure.
+      const hw = Math.min(1, Math.max(0, (v - 0.05) / 0.55)) * hStr;
+      return [
+        clamp(linearToSrgb(v * (1 + (hColor[0] - 1) * hw))),
+        clamp(linearToSrgb(v * (1 + (hColor[1] - 1) * hw))),
+        clamp(linearToSrgb(v * (1 + (hColor[2] - 1) * hw)))
+      ];
     };
   } else {
     RECIPES[key] = buildRecipeLUT(def);
@@ -940,11 +884,26 @@ for (const [key, def] of Object.entries(RECIPE_DEFS)) {
 const RECIPE_DESCRIPTIONS = {
   portra400: 'Soft, warm, low-contrast skin tones — best for portraits, golden hour, and relaxed everyday shots.',
   gold200: 'Warm, slightly saturated consumer film look — orange-yellow highlights, green-leaning shadows, golden skin tones.',
-  trix400: 'High-contrast black & white with a touch of warmth in the highlights — classic for moody portrait and street shots.'
+  trix400: 'High-contrast black & white with a touch of warmth in the highlights — classic for moody portrait and street shots.',
+  ultramax400: 'Punchy, saturated consumer film — warm skin, vivid reds and greens, more contrast than Gold. Great for bright travel and street.',
+  kodachrome64: 'Iconic slide film — dense blacks, high micro-contrast, deep reds and restrained blues. Rich and bold in strong light.'
 };
 const RECIPE_NAMES = {
-  portra400: 'Kodak Portra 400', gold200: 'Kodak Gold 200', trix400: 'Kodak Tri-X 400 (B&W)'
+  portra400: 'Kodak Portra 400', gold200: 'Kodak Gold 200', trix400: 'Kodak Tri-X 400 (B&W)',
+  ultramax400: 'Kodak Ultramax 400', kodachrome64: 'Kodachrome 64'
 };
+// Short, display-friendly border names for the reveal label (localized).
+const BORDER_NAMES = {
+  en: { white:'White film border', black:'Cinema border', rebate:'Film rebate',
+        sprocket:'35mm sprockets', polaroid:'Polaroid', instax:'Instax mini', vignette:'Soft vignette' },
+  it: { white:'Bordo pellicola', black:'Bordo cinema', rebate:'Rebate pellicola',
+        sprocket:'Fori 35mm', polaroid:'Polaroid', instax:'Instax mini', vignette:'Vignettatura' }
+};
+function borderDisplayName(style){
+  if(!style || style==='none') return '';
+  const lang = (typeof LANG!=='undefined' && BORDER_NAMES[LANG]) ? LANG : 'en';
+  return BORDER_NAMES[lang][style] || BORDER_NAMES.en[style] || '';
+}
 const recipeSelectEl = document.getElementById('recipe');
 const recipeDescEl = document.getElementById('recipeDesc');
 const recipePickerBtn = document.getElementById('recipePickerBtn');
@@ -961,9 +920,9 @@ function setRecipe(value) {
 
 function buildRecipeModal() {
   recipeModalList.innerHTML = Object.keys(RECIPE_NAMES).map(key => `
-    <div class="recipe-row" data-value="${key}" style="padding:18px 20px;border-bottom:1px solid var(--border);cursor:pointer;">
+    <div class="recipe-row" data-value="${key}" style="padding:18px 20px;border-bottom:1px solid #e8e0d4;cursor:pointer;">
       <div style="font-size:19px;color:#2a2118;font-family:Georgia, serif;">${RECIPE_NAMES[key]}</div>
-      <div style="font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.5;">${RECIPE_DESCRIPTIONS[key]}</div>
+      <div style="font-size:12.5px;color:#8a7560;margin-top:4px;line-height:1.5;">${RECIPE_DESCRIPTIONS[key]}</div>
     </div>
   `).join('');
   recipeModalList.querySelectorAll('.recipe-row').forEach(row => {
@@ -977,6 +936,100 @@ buildRecipeModal();
 
 recipePickerBtn.addEventListener('click', () => { recipeModalOverlay.style.display = 'flex'; });
 recipeModalOverlay.addEventListener('click', e => { if (e.target === recipeModalOverlay) recipeModalOverlay.style.display = 'none'; });
+
+// ==================== Instagram caption generator ====================
+// Self-contained (no backend): a curated phrase bank keyed to recipe + border.
+const CAPTION_BANK = {
+  en: {
+    look: {
+      portra400: ["Graded on Kodak Portra 400","Shot to feel like Portra 400","Portra 400 doing what it does best"],
+      gold200: ["Warmed up with Kodak Gold 200","Gold 200 all over this one","That Gold 200 glow"],
+      trix400: ["Tri-X 400 in black and white","Pushed into Tri-X 400 mono","Classic Tri-X grain"],
+      ultramax400: ["Punched up with Kodak Ultramax 400","Ultramax 400 colour, nice and bold","Ultramax 400 turning up the volume"],
+      kodachrome64: ["Rendered like Kodachrome 64","That deep Kodachrome 64 colour","Kodachrome 64, rich as ever"]
+    },
+    mood: {
+      portra400: ["soft, warm skin tones and a gentle roll-off","quiet golden light","an easy, natural warmth"],
+      gold200: ["sunny, nostalgic warmth","golden highlights and a holiday feel","that warm afternoon look"],
+      trix400: ["high contrast and honest grain","a moody, timeless mono look","deep blacks and bright highlights"],
+      ultramax400: ["vivid reds and greens","bright, saturated colour","a bold, punchy palette"],
+      kodachrome64: ["dense shadows and deep reds","rich, saturated colour with real depth","that legendary slide-film look"]
+    },
+    border: {
+      none:"", white:"framed with a clean white border", black:"set in a cinematic black frame",
+      rebate:"straight off the film rebate", sprocket:"shot through 35mm sprocket holes",
+      polaroid:"in an instant-photo frame", instax:"with that Instax mini look", vignette:"finished with a soft vignette"
+    },
+    cta: ["How do you like it?","What could be improved?","Which film recipe would you have picked?","Curious what you think."]
+  }
+};
+const CAPTION_TAGS = {
+  base: ["#filmphotography","#filmisnotdead","#shotonfilm","#analogphotography","#filmcommunity",
+         "#filmfeed","#filmlook","#analogvibes","#grainisgood","#reels","#reelsinstagram","#filmsimulation"],
+  baseBW: ["#blackandwhite","#bnwfilm","#blackandwhitephotography","#monochrome"],
+  recipe: {
+    portra400:["#portra400","#kodakportra","#portra"],
+    gold200:["#kodakgold200","#kodakgold","#gold200"],
+    trix400:["#trix400","#kodaktrix","#trix"],
+    ultramax400:["#ultramax400","#kodakultramax","#ultramax"],
+    kodachrome64:["#kodachrome","#kodachrome64","#slidefilm"]
+  },
+  border: {
+    none:[], white:["#filmborder"], black:["#cinematic"], rebate:["#filmrebate"],
+    sprocket:["#35mmfilm","#35mm","#sprocketholes"], polaroid:["#polaroid","#instantfilm"],
+    instax:["#instax","#instaxmini"], vignette:["#moody"]
+  }
+};
+function _rand(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
+function _capFirst(s){ return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+function _shuffle(arr){ const a = arr.slice(); for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+function generateInstagramCaption(){
+  const recipe = document.getElementById('recipe').value;
+  const border = document.getElementById('frameStyle').value;
+  const lang = 'en'; // captions and hashtags are English only
+  const B = CAPTION_BANK[lang];
+  const rkey = B.look[recipe] ? recipe : 'portra400';
+
+  const look = _rand(B.look[rkey]);
+  const mood = _rand(B.mood[rkey]);
+  const borderFrag = B.border[border] || '';
+  const cta = _rand(B.cta);
+
+  const line2 = _capFirst(mood) + (borderFrag ? ', ' + borderFrag : '') + '.';
+  const captionText = look + '.\n' + line2 + '\n' + cta;
+
+  // Hashtags — max 5, balanced: primary stock tag, one border tag, a B&W or
+  // Italian tag where relevant, then broad film tags to fill.
+  const picks = [];
+  const push = (tag) => { if (tag && picks.indexOf(tag) === -1 && picks.length < 5) picks.push(tag); };
+  const rtags = CAPTION_TAGS.recipe[rkey] || [];
+  push(rtags[0]);
+  if (border !== 'none') push((CAPTION_TAGS.border[border] || [])[0]);
+  if (rkey === 'trix400') push(CAPTION_TAGS.baseBW[0]);
+  for (const tag of _shuffle(CAPTION_TAGS.base)) push(tag);
+  push(rtags[1]);
+  const hashtags = picks.join(' ');
+
+  const out = document.getElementById('captionOut');
+  out.value = captionText + '\n\n' + hashtags;
+  out.style.display = 'block';
+  const copyBtn = document.getElementById('copyCaptionBtn');
+  copyBtn.style.display = 'block';
+  copyBtn.textContent = t('capCopy');
+}
+
+document.getElementById('genCaptionBtn').addEventListener('click', generateInstagramCaption);
+document.getElementById('copyCaptionBtn').addEventListener('click', () => {
+  const out = document.getElementById('captionOut');
+  const copyBtn = document.getElementById('copyCaptionBtn');
+  const done = () => { copyBtn.textContent = t('capCopied'); setTimeout(() => { copyBtn.textContent = t('capCopy'); }, 1600); };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(out.value).then(done).catch(() => { out.select(); document.execCommand('copy'); done(); });
+    } else { out.select(); document.execCommand('copy'); done(); }
+  } catch(e) { out.select(); try { document.execCommand('copy'); } catch(_){} done(); }
+});
 
 
 function gradeImageData(srcCanvas) {
@@ -1059,6 +1112,39 @@ document.getElementById('wmToggle').addEventListener('change', e => {
 });
 document.getElementById('wmText').addEventListener('input', updateScrubAvailability);
 document.getElementById('leakToggle').addEventListener('change', updateScrubAvailability);
+document.getElementById('weaveToggle').addEventListener('change', updateScrubAvailability);
+document.getElementById('halationToggle').addEventListener('change', updateScrubAvailability);
+document.getElementById('parallaxToggle').addEventListener('change', updateScrubAvailability);
+document.getElementById('recipeLabelToggle').addEventListener('change', updateScrubAvailability);
+
+// Surprise me: roll a random look. Happy accidents, the way film always was.
+function surpriseMe() {
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+  const chance = p => Math.random() < p;
+
+  // Motion
+  const pan = document.getElementById('panDirection'); if (pan) pan.value = pick(['none','lr','rl','tb','bt']);
+  const zoom = document.getElementById('zoomAmt');
+  if (zoom) { zoom.value = 8 + Math.floor(Math.random() * 20); zoom.dispatchEvent(new Event('input')); }
+  const frame = document.getElementById('frameStyle');
+  if (frame) frame.value = pick(['none','white','black','rebate','sprocket','vignette']);
+
+  // Effect mix (weighted so it usually looks good, sometimes bold)
+  const set = (id, on) => { const el = document.getElementById(id); if (el) el.checked = on; };
+  set('dustToggle', chance(0.6));
+  set('leakToggle', chance(0.6));
+  set('weaveToggle', chance(0.85));
+  set('halationToggle', chance(0.7));
+  set('parallaxToggle', chance(0.4));
+
+  // Film stock last: setRecipe re-grades every photo and refreshes the preview.
+  const stocks = Object.keys(RECIPE_NAMES);
+  if (stocks.length) setRecipe(pick(stocks));
+  else updateScrubAvailability();
+}
+const surpriseBtn = document.getElementById('surpriseBtn');
+if (surpriseBtn) surpriseBtn.addEventListener('click', surpriseMe);
+document.getElementById('revealToggle').addEventListener('change', () => { updateTotalDuration(); updateScrubAvailability(); });
 
 // ---- Export still ----
 function exportJpg() {
@@ -1244,6 +1330,106 @@ function drawLightLeakOnCtx(octx, W, H, progress) {
   octx.restore();
 }
 
+// --- Organic film motion: gate weave, flicker, halation, parallax ---
+// Reusable offscreen scratch canvases so we never allocate per frame.
+const _scratch = {};
+function getScratch(name, W, H) {
+  let c = _scratch[name];
+  if (!c) { c = document.createElement('canvas'); _scratch[name] = c; }
+  if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+  return c;
+}
+
+// Deterministic per-frame pseudo-random so preview and export match exactly.
+function _weaveHash(n) {
+  const s = Math.sin(n * 12.9898) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// Gate weave (tiny positional drift) + flicker (slight exposure flutter).
+// Amplitudes stay small on purpose: this reads as "film", not "shake".
+function computeWeave(fi) {
+  const t = fi;
+  const dx = Math.sin(t * 0.7) * 0.7 + Math.sin(t * 1.9 + 1.3) * 0.5 + (_weaveHash(t) - 0.5) * 1.1;
+  const dy = Math.cos(t * 0.6 + 0.5) * 0.8 + Math.sin(t * 2.3) * 0.4 + (_weaveHash(t + 97) - 0.5) * 1.1;
+  const bright = 1 + (Math.sin(t * 3.1) * 0.5 + (_weaveHash(t + 7) - 0.5)) * 0.035;
+  return { dx, dy, bright };
+}
+
+function applyFlickerOnCtx(octx, W, H, bright) {
+  if (Math.abs(bright - 1) < 0.001) return;
+  octx.save();
+  if (bright < 1) {
+    octx.globalCompositeOperation = 'source-over';
+    octx.fillStyle = 'rgba(0,0,0,' + (1 - bright).toFixed(4) + ')';
+  } else {
+    octx.globalCompositeOperation = 'screen';
+    octx.fillStyle = 'rgba(255,255,255,' + (bright - 1).toFixed(4) + ')';
+  }
+  octx.fillRect(0, 0, W, H);
+  octx.restore();
+}
+
+// Halation: isolate highlights, blur them, screen them back so bright areas
+// bloom and bleed the way real film does.
+function applyHalationOnCtx(octx, W, H) {
+  const src = octx.canvas;
+  const a = getScratch('haloA', W, H), actx = a.getContext('2d');
+  actx.save();
+  actx.clearRect(0, 0, W, H);
+  // Crush shadows/mids toward black, keep and lift the highlights.
+  actx.filter = 'brightness(1.35) contrast(2.6) saturate(1.15)';
+  actx.drawImage(src, 0, 0, W, H);
+  actx.restore();
+
+  const b = getScratch('haloB', W, H), bctx = b.getContext('2d');
+  bctx.save();
+  bctx.clearRect(0, 0, W, H);
+  bctx.filter = 'blur(' + Math.max(6, Math.round(W * 0.013)) + 'px)';
+  bctx.drawImage(a, 0, 0);
+  bctx.restore();
+
+  octx.save();
+  octx.globalCompositeOperation = 'screen';
+  octx.globalAlpha = 0.45;
+  octx.drawImage(b, 0, 0, W, H);
+  octx.restore();
+}
+
+// Parallax depth pop: draw the photo as two layers around the focal point.
+// Background sits slightly back, a soft-masked foreground pushes slightly
+// forward, so a flat still gains a gentle sense of depth during the move.
+function drawPhotoWithParallax(octx, timeline, img, zoom, ax, ay, prog) {
+  const { W, H, fitMode } = timeline;
+  const amt = 0.05 * Math.max(0, Math.min(1, prog)); // grows through the move
+  // Background layer: a touch less zoom.
+  octx.save();
+  const bz = zoom * (1 - amt * 0.5);
+  octx.translate(ax, ay); octx.scale(bz, bz); octx.translate(-ax, -ay);
+  drawImageOnCtx(octx, img, W, H, fitMode);
+  octx.restore();
+  if (amt < 0.002) return;
+  // Foreground layer: a touch more zoom, soft radial mask around the subject.
+  const fg = getScratch('pfg', W, H), fctx = fg.getContext('2d');
+  fctx.clearRect(0, 0, W, H);
+  fctx.save();
+  const fz = zoom * (1 + amt);
+  fctx.translate(ax, ay); fctx.scale(fz, fz); fctx.translate(-ax, -ay);
+  drawImageOnCtx(fctx, img, W, H, fitMode);
+  fctx.restore();
+  fctx.save();
+  fctx.globalCompositeOperation = 'destination-in';
+  const rad = Math.max(W, H) * 0.55;
+  const g = fctx.createRadialGradient(ax, ay, rad * 0.12, ax, ay, rad);
+  g.addColorStop(0, 'rgba(0,0,0,1)');
+  g.addColorStop(0.55, 'rgba(0,0,0,0.7)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  fctx.fillStyle = g;
+  fctx.fillRect(0, 0, W, H);
+  fctx.restore();
+  octx.drawImage(fg, 0, 0, W, H);
+}
+
 // Watermark: semi-transparent box, centered horizontally, 1/3 from bottom
 function drawWatermarkOnCtx(octx, W, H, text) {
   if (!text) return;
@@ -1392,7 +1578,8 @@ function drawCoverCardOnCtx(octx, W, H, bgImage, coverLabel, revealT) {
   octx.fillRect(0, 0, W, H);
   octx.save();
   octx.globalAlpha = 0.92;
-  drawImageOnCtx(octx, bgImage, W, H, timeline.fitMode);
+  // Full-bleed darkened backdrop — always cover-fit (no black bars behind the title).
+  drawImageOnCtx(octx, bgImage, W, H, 'cover');
   octx.fillStyle = 'rgba(0,0,0,0.55)';
   octx.fillRect(0, 0, W, H);
   octx.restore();
@@ -1443,12 +1630,27 @@ function buildTimeline() {
   const panDirection = document.getElementById('panDirection').value;
   const useDust = document.getElementById('dustToggle').checked;
   const useLeak = document.getElementById('leakToggle').checked;
+  const useWeave = !!document.getElementById('weaveToggle')?.checked;
+  const useHalation = !!document.getElementById('halationToggle')?.checked;
+  const useParallax = !!document.getElementById('parallaxToggle')?.checked;
+  const showRecipeLabel = document.getElementById('recipeLabelToggle') ? document.getElementById('recipeLabelToggle').checked : true;
   const frameStyle = document.getElementById('frameStyle').value;
   const fitMode = document.getElementById('fitMode').value;
   const coverLabel = document.getElementById('coverLabel').value.trim();
   const useCover = coverLabel.length > 0;
   const wmEnabled = document.getElementById('wmToggle').checked;
   const wmText = wmEnabled ? document.getElementById('wmText').value.trim() : '';
+
+  // Before/after reveal intro: uses the first graded photo's raw + graded canvases.
+  const useReveal = !!document.getElementById('revealToggle')?.checked;
+  const revealSec = 2.3;
+  const firstGraded = gradedPhotos[0];
+  const revealBase = (useReveal && firstGraded && firstGraded.baseCanvas) ? firstGraded.baseCanvas : null;
+  const revealGraded = (useReveal && firstGraded && firstGraded.gradedCanvas) ? firstGraded.gradedCanvas : null;
+  const revealOn = !!(revealBase && revealGraded);
+  const recipeName = (typeof RECIPE_NAMES !== 'undefined'
+    ? RECIPE_NAMES[document.getElementById('recipe').value]
+    : '') || '';
 
   const crossfadeSec = 1.5;
   const coverSec = 3.2;
@@ -1485,23 +1687,84 @@ function buildTimeline() {
   }
 
   const coverFrames = useCover ? Math.round(coverSec * FPS) : 0;
+  const revealFrames = revealOn ? Math.round(revealSec * FPS) : 0;
   const slideFrameTotal = slides.reduce((s, sl) => s + sl.transitionFrames + sl.zoomFrames, 0);
-  const totalFrames = slideFrameTotal + coverFrames;
+  const totalFrames = revealFrames + slideFrameTotal + coverFrames;
 
   return {
     W: REEL_W, H: REEL_H, FPS, slides, coverFrames, coverLabel, useCover,
-    useDust, useLeak, frameStyle, fitMode, totalFrames, slideFrameTotal,
+    useDust, useLeak, useWeave, useHalation, useParallax, showRecipeLabel, frameStyle, fitMode, totalFrames, slideFrameTotal,
     lastSlideFadeTo: slides[slides.length - 1].fadeTo,
-    wmText
+    wmText,
+    revealFrames, revealBase, revealGraded, recipeName
   };
 }
 
 // Renders a single absolute frame index onto the given context. Used by both the
 // recorder loop (sequential) and the scrub bar (random access, instant).
+// Bottom pill naming the film simulation (and border, if any). Shared by the
+// reveal intro and the main reel so the label stays on screen through the zoom.
+function drawSimLabel(octx, W, H, recipeName, borderStyle, alpha) {
+  if (!recipeName || alpha <= 0) return;
+  const line1 = recipeName.toUpperCase();
+  const line2 = borderDisplayName(borderStyle).toUpperCase();
+  octx.save();
+  octx.globalAlpha = alpha;
+  octx.textAlign = 'center';
+  octx.textBaseline = 'middle';
+
+  const f1 = 40, f2 = 24, gap = 8, padX = 34, padY = 22;
+  octx.font = '700 ' + f1 + 'px "Helvetica Neue", Helvetica, Arial, sans-serif';
+  const w1 = octx.measureText(line1).width;
+  let w2 = 0;
+  if (line2) {
+    octx.font = '600 ' + f2 + 'px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    w2 = octx.measureText(line2).width;
+  }
+  const contentH = f1 + (line2 ? gap + f2 : 0);
+  const pillW = Math.max(w1, w2) + padX * 2;
+  const pillH = contentH + padY * 2;
+  // Sit clear of thick bottom borders (Polaroid ~16% H, Instax ~9% H); default 150px.
+  let bottomMargin = 150;
+  if (borderStyle === 'polaroid') bottomMargin = Math.round(H * 0.16) + 34;
+  else if (borderStyle === 'instax') bottomMargin = Math.round(H * 0.09) + 30;
+  const pillY = H - pillH - bottomMargin;
+
+  octx.fillStyle = 'rgba(20,15,10,0.55)';
+  roundRectOnCtx(octx, (W - pillW) / 2, pillY, pillW, pillH, Math.min(pillH / 2, 40), true);
+
+  octx.font = '700 ' + f1 + 'px "Helvetica Neue", Helvetica, Arial, sans-serif';
+  octx.fillStyle = '#fdfaf6';
+  octx.fillText(line1, W / 2, pillY + padY + f1 / 2 + 1);
+
+  if (line2) {
+    octx.font = '600 ' + f2 + 'px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    octx.fillStyle = '#d8c6ab';
+    octx.fillText(line2, W / 2, pillY + padY + f1 + gap + f2 / 2 + 1);
+  }
+  octx.restore();
+}
+
 function renderFrame(octx, timeline, fi) {
   const { W, H } = timeline;
+
+  // Reveal intro plays before everything else. Once past it, shift the frame
+  // index back so all existing slide/cover logic below is untouched.
+  const rf = timeline.revealFrames || 0;
+  if (rf > 0 && fi < rf) {
+    renderRevealFrame(octx, timeline, fi, rf);
+    return;
+  }
+  fi -= rf;
+
   octx.fillStyle = '#000';
   octx.fillRect(0, 0, W, H);
+
+  // Gate weave: the whole projected image drifts a hair each frame. The outer
+  // black fill above already covers the sliver this exposes at the edge.
+  const __w = computeWeave(fi);
+  octx.save();
+  if (timeline.useWeave) octx.translate(__w.dx, __w.dy);
 
   let cursor = 0;
   let inOverlayPhase = false;
@@ -1562,10 +1825,14 @@ function renderFrame(octx, timeline, fi) {
       const curAy = slide.pan.ay0 + (slide.pan.ay1 - slide.pan.ay0) * zoom_t;
 
       octx.save();
-      octx.translate(curAx, curAy);
-      octx.scale(zoom, zoom);
-      octx.translate(-curAx, -curAy);
-      drawImageOnCtx(octx, slide.fadeTo, W, H, timeline.fitMode);
+      if (timeline.useParallax) {
+        drawPhotoWithParallax(octx, timeline, slide.fadeTo, zoom, curAx, curAy, zoom_t);
+      } else {
+        octx.translate(curAx, curAy);
+        octx.scale(zoom, zoom);
+        octx.translate(-curAx, -curAy);
+        drawImageOnCtx(octx, slide.fadeTo, W, H, timeline.fitMode);
+      }
       octx.restore();
       inOverlayPhase = true;
       matched = true;
@@ -1586,6 +1853,102 @@ function renderFrame(octx, timeline, fi) {
     const overallT = fi / Math.max(1, timeline.slideFrameTotal);
     if (timeline.useLeak) drawLightLeakOnCtx(octx, W, H, overallT);
     if (timeline.useDust) drawDustScratchesOnCtx(octx, W, H);
+    // Keep the film-simulation label on screen through the zoom, not just the reveal.
+    if (timeline.showRecipeLabel) drawSimLabel(octx, W, H, timeline.recipeName, timeline.frameStyle, 1);
+  }
+
+  // End gate-weave transform, then bloom and flicker act on the weaved image.
+  // The frame border and watermark sit outside the weave, like a steady gate.
+  octx.restore();
+  if (timeline.useHalation) applyHalationOnCtx(octx, W, H);
+  if (timeline.useWeave) applyFlickerOnCtx(octx, W, H, __w.bright);
+
+  drawFrameBorderOnCtx(octx, W, H, timeline.frameStyle);
+  if (timeline.wmText) drawWatermarkOnCtx(octx, W, H, timeline.wmText);
+}
+
+// Before/after reveal intro. Draws the raw first photo, wipes the graded look
+// across it left-to-right, then holds on the graded frame with the recipe name.
+function renderRevealFrame(octx, timeline, fi, rf) {
+  const { W, H, fitMode, revealBase, revealGraded, recipeName } = timeline;
+
+  octx.fillStyle = '#000';
+  octx.fillRect(0, 0, W, H);
+
+  const t = rf > 1 ? fi / (rf - 1) : 1;               // 0..1 across the whole intro
+  const holdRawEnd = 0.22, wipeEnd = 0.78;            // phase boundaries
+
+  // Wipe progress: 0 = all raw, 1 = all graded.
+  let wp;
+  if (t < holdRawEnd) wp = 0;
+  else if (t > wipeEnd) wp = 1;
+  else wp = easeInOutCubic((t - holdRawEnd) / (wipeEnd - holdRawEnd));
+  const wipeX = Math.round(W * wp);
+
+  // Gentle shared push so the frame feels alive; identical transform for both
+  // layers keeps the before/after pixel-aligned.
+  const z = 1 + 0.04 * easeOutCubic(t);
+  const cx = W / 2, cy = H / 2;
+  const applyZoom = () => { octx.translate(cx, cy); octx.scale(z, z); octx.translate(-cx, -cy); };
+
+  // Raw photo (right side / underneath)
+  octx.save();
+  applyZoom();
+  drawImageOnCtx(octx, revealBase, W, H, fitMode);
+  octx.restore();
+
+  // Graded photo, clipped to the swept-over portion (left of the wipe line)
+  if (wipeX > 0) {
+    octx.save();
+    octx.beginPath();
+    octx.rect(0, 0, wipeX, H);
+    octx.clip();
+    applyZoom();
+    drawImageOnCtx(octx, revealGraded, W, H, fitMode);
+    octx.restore();
+  }
+
+  // Soft leading edge on the wipe line while it travels
+  if (wipeX > 0 && wipeX < W) {
+    const gw = 46;
+    const grad = octx.createLinearGradient(wipeX - gw, 0, wipeX + 6, 0);
+    grad.addColorStop(0, 'rgba(255,255,255,0)');
+    grad.addColorStop(1, 'rgba(255,255,255,0.28)');
+    octx.fillStyle = grad;
+    octx.fillRect(wipeX - gw, 0, gw, H);
+    octx.fillStyle = 'rgba(255,255,255,0.85)';
+    octx.fillRect(wipeX - 2, 0, 3, H);
+  }
+
+  // "ORIGINAL" marker on the raw photo — present during the raw hold, fading out
+  // as the film look sweeps across so it never sits over the graded side.
+  const origAlpha = Math.max(0, Math.min(1, t / 0.06)) * (1 - wp);
+  if (origAlpha > 0.01) {
+    const oLabel = (I18N[LANG] && I18N[LANG].revealOriginal) || I18N.en.revealOriginal || 'Original';
+    const label = String(oLabel).toUpperCase();
+    octx.save();
+    octx.globalAlpha = origAlpha;
+    const fs = 28;
+    octx.font = '700 ' + fs + 'px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    octx.textAlign = 'center';
+    octx.textBaseline = 'middle';
+    const tw = octx.measureText(label).width;
+    const px = 26, py = 14;
+    const pw = tw + px * 2, ph = fs + py * 2;
+    const pxX = (W - pw) / 2, pyY = 150;
+    octx.fillStyle = 'rgba(20,15,10,0.5)';
+    roundRectOnCtx(octx, pxX, pyY, pw, ph, ph / 2, true);
+    octx.fillStyle = '#fdfaf6';
+    octx.fillText(label, W / 2, pyY + ph / 2 + 1);
+    octx.restore();
+  }
+
+  // Recipe + border pill — appears only once the wipe (transformation) is
+  // finished, fading in over the graded hold. It then continues at full opacity
+  // through the zoom (drawn by renderFrame) to the end.
+  if (recipeName && timeline.showRecipeLabel) {
+    const labelAlpha = Math.max(0, Math.min(1, (t - wipeEnd) / 0.16));
+    drawSimLabel(octx, W, H, recipeName, timeline.frameStyle, labelAlpha);
   }
 
   drawFrameBorderOnCtx(octx, W, H, timeline.frameStyle);
@@ -1867,6 +2230,10 @@ function renderMusicMarkers(timeline) {
   const marks = [];
   let cursor = 0;
   marks.push([0, 'Reel starts']);
+  if (timeline.revealFrames > 0) {
+    cursor += timeline.revealFrames / timeline.FPS;
+    marks.push([cursor, 'Reveal wipe complete — first photo begins']);
+  }
   timeline.slides.forEach((slide, i) => {
     const transSec = slide.transitionFrames / timeline.FPS;
     const zoomSec = slide.zoomFrames / timeline.FPS;
@@ -2018,9 +2385,10 @@ async function runDiagnostics() {
     'fileInput','dropZone','canvas','recipe','strength','grain',
     'applyBtn','exportJpgBtn','buildReelBtn','surpriseBtn',
     'duration','zoomAmt','panDirection','fitMode','frameStyle',
-    'dustToggle','leakToggle','coverLabel','wmToggle','wmText',
+    'dustToggle','leakToggle','revealToggle','coverLabel','wmToggle','wmText',
     'scrubBar','scrubCanvas','progressWrap','outputWrap',
     'coverCard','coverCanvas','markersWrap',
+    'genCaptionBtn','captionOut','copyCaptionBtn',
     'recipePickerBtn','recipeModalOverlay','photoQueue'
   ];
   const missing = requiredIds.filter(id => !document.getElementById(id));
@@ -2275,13 +2643,13 @@ async function runDiagnostics() {
   const passed = results.filter(r => r.ok).length;
   const failed_n = results.filter(r => !r.ok).length;
   out.innerHTML = results.map(r => `
-    <div style="display:flex;align-items:flex-start;gap:8px;padding:3px 0;border-bottom:1px solid var(--card2)">
-      <span style="color:${r.ok?'#007AFF':'#c0392b'};flex-shrink:0;font-weight:700;font-size:13px">${r.ok?'✓':'✗'}</span>
+    <div style="display:flex;align-items:flex-start;gap:8px;padding:3px 0;border-bottom:1px solid #f0ebe3">
+      <span style="color:${r.ok?'#2e8c5a':'#c0392b'};flex-shrink:0;font-weight:700;font-size:13px">${r.ok?'✓':'✗'}</span>
       <span style="color:${r.ok?'#3d2e1a':'#c0392b'};font-size:11px">${r.label}${r.reason?`<br><span style="font-size:10px;opacity:0.75">${r.reason}</span>`:''}</span>
     </div>
   `).join('') + `
     <div style="margin-top:12px;padding:8px 10px;border-radius:6px;font-size:12px;font-weight:700;
-      background:${failed_n===0?'var(--accent-light)':'#fde8e8'};color:${failed_n===0?'#007AFF':'#c0392b'}">
+      background:${failed_n===0?'#e8f4ee':'#fde8e8'};color:${failed_n===0?'#2e8c5a':'#c0392b'}">
       ${passed}/${results.length} passed${failed_n>0?` — ${failed_n} failed — see ✗ above`:' — all systems go'}
     </div>
   `;
