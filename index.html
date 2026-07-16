@@ -106,6 +106,23 @@
     color: var(--accent);
     min-height: 28px;
   }
+  .hub-footer {
+    margin-top: 28px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink);
+    line-height: 1.55;
+    letter-spacing: -0.01em;
+  }
+  .hub-footer a {
+    color: var(--accent);
+    font-weight: 600;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(0, 122, 255, 0.35);
+  }
+  .hub-footer a:hover { border-bottom-color: var(--accent); }
   @media (max-width: 480px) {
     .brand-sub { display: none; }
     .card { padding: 16px; }
@@ -134,6 +151,26 @@
       <div class="card-desc">Grade photos with film recipes and export stills or reels.</div>
       <div class="tag">Open tool →</div>
     </a>
+    <a class="card" href="film-strip-studio.html">
+      <div class="card-title">Film Strip Studio</div>
+      <div class="card-desc">Build a looping multi-photo film strip reel with realistic 35mm edges and film recipes.</div>
+      <div class="tag">Open tool →</div>
+    </a>
+    <p class="hub-footer">
+      Questions or ideas:
+      <a href="mailto:rbisschoff@gmail.com?subject=Film%20Tools" data-contact-tool="film-tools">rbisschoff@gmail.com</a>
+      ·
+      <a href="https://www.linkedin.com/in/roger-bisschoff/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+    </p>
   </main>
+  <script>
+    document.addEventListener('click', function(e) {
+      const a = e.target.closest('a[data-contact-tool]');
+      if (!a) return;
+      if (typeof gtag === 'function') {
+        gtag('event', 'contact_click', { tool: a.getAttribute('data-contact-tool') });
+      }
+    });
+  </script>
 </body>
 </html>
