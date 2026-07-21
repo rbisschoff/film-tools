@@ -188,18 +188,6 @@
     <input type="checkbox" id="leakToggle" checked>
   </div>
   <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
-    <span style="font-size:12px;color:#5c4a32;" data-i18n="weave">Gate weave &amp; flicker</span>
-    <input type="checkbox" id="weaveToggle" checked>
-  </div>
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
-    <span style="font-size:12px;color:#5c4a32;" data-i18n="halation">Halation glow</span>
-    <input type="checkbox" id="halationToggle" checked>
-  </div>
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
-    <span style="font-size:12px;color:#5c4a32;" data-i18n="parallax">Parallax depth (experimental)</span>
-    <input type="checkbox" id="parallaxToggle">
-  </div>
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8e0d4;">
     <span style="font-size:12px;color:#5c4a32;" data-i18n="recipeLabel">Show recipe label in video</span>
     <input type="checkbox" id="recipeLabelToggle" checked>
   </div>
@@ -307,7 +295,6 @@ const I18N = {
     moveLR:"Zoom + pan left → right", moveRL:"Zoom + pan right → left",
     moveTB:"Zoom + pan top → bottom", moveBT:"Zoom + pan bottom → top",
     dust:"Dust & scratches", leak:"Light leak",
-    weave:"Gate weave & flicker", halation:"Halation glow", parallax:"Parallax depth (experimental)",
     surprise:"Surprise me", surpriseHint:"Rolls a random film stock, motion, frame and effect mix. Happy accidents, the way film always was.",
     recipeLabel:"Show recipe label in video",
     revealLbl:"Before / after reveal intro",
@@ -356,7 +343,6 @@ const I18N = {
     moveLR:"Zoom + panoramica sinistra → destra", moveRL:"Zoom + panoramica destra → sinistra",
     moveTB:"Zoom + panoramica alto → basso", moveBT:"Zoom + panoramica basso → alto",
     dust:"Polvere e graffi", leak:"Fuga di luce",
-    weave:"Oscillazione & sfarfallio", halation:"Alone luminoso", parallax:"Profondità parallasse (sperimentale)",
     surprise:"Sorprendimi", surpriseHint:"Sceglie a caso pellicola, movimento, cornice ed effetti. Piccoli incidenti felici, come voleva la pellicola.",
     recipeLabel:"Mostra etichetta pellicola nel video",
     revealLbl:"Intro prima / dopo",
@@ -1112,9 +1098,6 @@ document.getElementById('wmToggle').addEventListener('change', e => {
 });
 document.getElementById('wmText').addEventListener('input', updateScrubAvailability);
 document.getElementById('leakToggle').addEventListener('change', updateScrubAvailability);
-document.getElementById('weaveToggle').addEventListener('change', updateScrubAvailability);
-document.getElementById('halationToggle').addEventListener('change', updateScrubAvailability);
-document.getElementById('parallaxToggle').addEventListener('change', updateScrubAvailability);
 document.getElementById('recipeLabelToggle').addEventListener('change', updateScrubAvailability);
 
 // Surprise me: roll a random look. Happy accidents, the way film always was.
@@ -1133,9 +1116,6 @@ function surpriseMe() {
   const set = (id, on) => { const el = document.getElementById(id); if (el) el.checked = on; };
   set('dustToggle', chance(0.6));
   set('leakToggle', chance(0.6));
-  set('weaveToggle', chance(0.85));
-  set('halationToggle', chance(0.7));
-  set('parallaxToggle', chance(0.4));
 
   // Film stock last: setRecipe re-grades every photo and refreshes the preview.
   const stocks = Object.keys(RECIPE_NAMES);
@@ -1330,106 +1310,6 @@ function drawLightLeakOnCtx(octx, W, H, progress) {
   octx.restore();
 }
 
-// --- Organic film motion: gate weave, flicker, halation, parallax ---
-// Reusable offscreen scratch canvases so we never allocate per frame.
-const _scratch = {};
-function getScratch(name, W, H) {
-  let c = _scratch[name];
-  if (!c) { c = document.createElement('canvas'); _scratch[name] = c; }
-  if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
-  return c;
-}
-
-// Deterministic per-frame pseudo-random so preview and export match exactly.
-function _weaveHash(n) {
-  const s = Math.sin(n * 12.9898) * 43758.5453;
-  return s - Math.floor(s);
-}
-
-// Gate weave (tiny positional drift) + flicker (slight exposure flutter).
-// Amplitudes stay small on purpose: this reads as "film", not "shake".
-function computeWeave(fi) {
-  const t = fi;
-  const dx = Math.sin(t * 0.7) * 0.7 + Math.sin(t * 1.9 + 1.3) * 0.5 + (_weaveHash(t) - 0.5) * 1.1;
-  const dy = Math.cos(t * 0.6 + 0.5) * 0.8 + Math.sin(t * 2.3) * 0.4 + (_weaveHash(t + 97) - 0.5) * 1.1;
-  const bright = 1 + (Math.sin(t * 3.1) * 0.5 + (_weaveHash(t + 7) - 0.5)) * 0.035;
-  return { dx, dy, bright };
-}
-
-function applyFlickerOnCtx(octx, W, H, bright) {
-  if (Math.abs(bright - 1) < 0.001) return;
-  octx.save();
-  if (bright < 1) {
-    octx.globalCompositeOperation = 'source-over';
-    octx.fillStyle = 'rgba(0,0,0,' + (1 - bright).toFixed(4) + ')';
-  } else {
-    octx.globalCompositeOperation = 'screen';
-    octx.fillStyle = 'rgba(255,255,255,' + (bright - 1).toFixed(4) + ')';
-  }
-  octx.fillRect(0, 0, W, H);
-  octx.restore();
-}
-
-// Halation: isolate highlights, blur them, screen them back so bright areas
-// bloom and bleed the way real film does.
-function applyHalationOnCtx(octx, W, H) {
-  const src = octx.canvas;
-  const a = getScratch('haloA', W, H), actx = a.getContext('2d');
-  actx.save();
-  actx.clearRect(0, 0, W, H);
-  // Crush shadows/mids toward black, keep and lift the highlights.
-  actx.filter = 'brightness(1.35) contrast(2.6) saturate(1.15)';
-  actx.drawImage(src, 0, 0, W, H);
-  actx.restore();
-
-  const b = getScratch('haloB', W, H), bctx = b.getContext('2d');
-  bctx.save();
-  bctx.clearRect(0, 0, W, H);
-  bctx.filter = 'blur(' + Math.max(6, Math.round(W * 0.013)) + 'px)';
-  bctx.drawImage(a, 0, 0);
-  bctx.restore();
-
-  octx.save();
-  octx.globalCompositeOperation = 'screen';
-  octx.globalAlpha = 0.45;
-  octx.drawImage(b, 0, 0, W, H);
-  octx.restore();
-}
-
-// Parallax depth pop: draw the photo as two layers around the focal point.
-// Background sits slightly back, a soft-masked foreground pushes slightly
-// forward, so a flat still gains a gentle sense of depth during the move.
-function drawPhotoWithParallax(octx, timeline, img, zoom, ax, ay, prog) {
-  const { W, H, fitMode } = timeline;
-  const amt = 0.05 * Math.max(0, Math.min(1, prog)); // grows through the move
-  // Background layer: a touch less zoom.
-  octx.save();
-  const bz = zoom * (1 - amt * 0.5);
-  octx.translate(ax, ay); octx.scale(bz, bz); octx.translate(-ax, -ay);
-  drawImageOnCtx(octx, img, W, H, fitMode);
-  octx.restore();
-  if (amt < 0.002) return;
-  // Foreground layer: a touch more zoom, soft radial mask around the subject.
-  const fg = getScratch('pfg', W, H), fctx = fg.getContext('2d');
-  fctx.clearRect(0, 0, W, H);
-  fctx.save();
-  const fz = zoom * (1 + amt);
-  fctx.translate(ax, ay); fctx.scale(fz, fz); fctx.translate(-ax, -ay);
-  drawImageOnCtx(fctx, img, W, H, fitMode);
-  fctx.restore();
-  fctx.save();
-  fctx.globalCompositeOperation = 'destination-in';
-  const rad = Math.max(W, H) * 0.55;
-  const g = fctx.createRadialGradient(ax, ay, rad * 0.12, ax, ay, rad);
-  g.addColorStop(0, 'rgba(0,0,0,1)');
-  g.addColorStop(0.55, 'rgba(0,0,0,0.7)');
-  g.addColorStop(1, 'rgba(0,0,0,0)');
-  fctx.fillStyle = g;
-  fctx.fillRect(0, 0, W, H);
-  fctx.restore();
-  octx.drawImage(fg, 0, 0, W, H);
-}
-
 // Watermark: semi-transparent box, centered horizontally, 1/3 from bottom
 function drawWatermarkOnCtx(octx, W, H, text) {
   if (!text) return;
@@ -1495,8 +1375,8 @@ function drawFrameBorderOnCtx(octx, W, H, style) {
     octx.fillRect(0, H - bw, W, bw);
     const holeW = bw * 0.34, holeH = bw * 0.5, gap = bw * 0.55;
     for (let x = gap / 2; x < W; x += holeW + gap) {
-      roundRectOnCtx(octx, x, bw * 0.25, holeW, holeH, 3, '#1c1c1c');
-      roundRectOnCtx(octx, x, H - bw + bw * 0.25, holeW, holeH, 3, '#1c1c1c');
+      roundRectOnCtx(octx, x, bw * 0.25, holeW, holeH, 3, '#efe9dd');
+      roundRectOnCtx(octx, x, H - bw + bw * 0.25, holeW, holeH, 3, '#efe9dd');
     }
   } else if (style === 'polaroid') {
     const side = W * 0.05, top = W * 0.05, bottom = H * 0.16;
@@ -1630,9 +1510,6 @@ function buildTimeline() {
   const panDirection = document.getElementById('panDirection').value;
   const useDust = document.getElementById('dustToggle').checked;
   const useLeak = document.getElementById('leakToggle').checked;
-  const useWeave = !!document.getElementById('weaveToggle')?.checked;
-  const useHalation = !!document.getElementById('halationToggle')?.checked;
-  const useParallax = !!document.getElementById('parallaxToggle')?.checked;
   const showRecipeLabel = document.getElementById('recipeLabelToggle') ? document.getElementById('recipeLabelToggle').checked : true;
   const frameStyle = document.getElementById('frameStyle').value;
   const fitMode = document.getElementById('fitMode').value;
@@ -1693,7 +1570,7 @@ function buildTimeline() {
 
   return {
     W: REEL_W, H: REEL_H, FPS, slides, coverFrames, coverLabel, useCover,
-    useDust, useLeak, useWeave, useHalation, useParallax, showRecipeLabel, frameStyle, fitMode, totalFrames, slideFrameTotal,
+    useDust, useLeak, showRecipeLabel, frameStyle, fitMode, totalFrames, slideFrameTotal,
     lastSlideFadeTo: slides[slides.length - 1].fadeTo,
     wmText,
     revealFrames, revealBase, revealGraded, recipeName
@@ -1760,12 +1637,6 @@ function renderFrame(octx, timeline, fi) {
   octx.fillStyle = '#000';
   octx.fillRect(0, 0, W, H);
 
-  // Gate weave: the whole projected image drifts a hair each frame. The outer
-  // black fill above already covers the sliver this exposes at the edge.
-  const __w = computeWeave(fi);
-  octx.save();
-  if (timeline.useWeave) octx.translate(__w.dx, __w.dy);
-
   let cursor = 0;
   let inOverlayPhase = false;
   let matched = false;
@@ -1825,14 +1696,10 @@ function renderFrame(octx, timeline, fi) {
       const curAy = slide.pan.ay0 + (slide.pan.ay1 - slide.pan.ay0) * zoom_t;
 
       octx.save();
-      if (timeline.useParallax) {
-        drawPhotoWithParallax(octx, timeline, slide.fadeTo, zoom, curAx, curAy, zoom_t);
-      } else {
-        octx.translate(curAx, curAy);
-        octx.scale(zoom, zoom);
-        octx.translate(-curAx, -curAy);
-        drawImageOnCtx(octx, slide.fadeTo, W, H, timeline.fitMode);
-      }
+      octx.translate(curAx, curAy);
+      octx.scale(zoom, zoom);
+      octx.translate(-curAx, -curAy);
+      drawImageOnCtx(octx, slide.fadeTo, W, H, timeline.fitMode);
       octx.restore();
       inOverlayPhase = true;
       matched = true;
@@ -1856,12 +1723,6 @@ function renderFrame(octx, timeline, fi) {
     // Keep the film-simulation label on screen through the zoom, not just the reveal.
     if (timeline.showRecipeLabel) drawSimLabel(octx, W, H, timeline.recipeName, timeline.frameStyle, 1);
   }
-
-  // End gate-weave transform, then bloom and flicker act on the weaved image.
-  // The frame border and watermark sit outside the weave, like a steady gate.
-  octx.restore();
-  if (timeline.useHalation) applyHalationOnCtx(octx, W, H);
-  if (timeline.useWeave) applyFlickerOnCtx(octx, W, H, __w.bright);
 
   drawFrameBorderOnCtx(octx, W, H, timeline.frameStyle);
   if (timeline.wmText) drawWatermarkOnCtx(octx, W, H, timeline.wmText);

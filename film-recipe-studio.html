@@ -1074,8 +1074,8 @@ function drawFrameBorderOnCtx(octx, W, H, style) {
     octx.fillRect(0, H - bw, W, bw);
     const holeW = bw * 0.34, holeH = bw * 0.5, gap = bw * 0.55;
     for (let x = gap / 2; x < W; x += holeW + gap) {
-      roundRectOnCtx(octx, x, bw * 0.25, holeW, holeH, 3, '#1c1c1c');
-      roundRectOnCtx(octx, x, H - bw + bw * 0.25, holeW, holeH, 3, '#1c1c1c');
+      roundRectOnCtx(octx, x, bw * 0.25, holeW, holeH, 3, '#efe9dd');
+      roundRectOnCtx(octx, x, H - bw + bw * 0.25, holeW, holeH, 3, '#efe9dd');
     }
   } else if (style === 'polaroid') {
     const side = W * 0.05, top = W * 0.05, bottom = H * 0.16;
