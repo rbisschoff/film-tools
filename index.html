@@ -138,28 +138,6 @@
     color: var(--accent);
     min-height: 28px;
   }
-  .hub-footer {
-    margin-top: 28px;
-    padding: 14px 16px;
-    border-radius: 12px;
-    border: 0.5px solid rgba(0, 122, 255, 0.16);
-    background: rgba(255, 255, 255, 0.72);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    box-shadow: 0 0 0 1px rgba(0, 122, 255, 0.04), 0 8px 28px rgba(0, 122, 255, 0.08);
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--ink);
-    line-height: 1.55;
-    letter-spacing: -0.01em;
-  }
-  .hub-footer a {
-    color: var(--accent);
-    font-weight: 600;
-    text-decoration: none;
-    border-bottom: 1px solid rgba(0, 122, 255, 0.35);
-  }
-  .hub-footer a:hover { border-bottom-color: var(--accent); }
   @media (max-width: 480px) {
     .brand-sub { display: none; }
     .card { padding: 16px; }
@@ -194,21 +172,6 @@
       <div class="card-desc">Build a looping multi-photo film strip reel with realistic 35mm edges and film recipes.</div>
       <div class="tag">Open tool →</div>
     </a>
-    <p class="hub-footer">
-      Questions or ideas:
-      <a href="mailto:rbisschoff@gmail.com?subject=Film%20Tools" data-contact-tool="film-tools">rbisschoff@gmail.com</a>
-      ·
-      <a href="https://www.linkedin.com/in/roger-bisschoff/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
-    </p>
   </main>
-  <script>
-    document.addEventListener('click', function(e) {
-      const a = e.target.closest('a[data-contact-tool]');
-      if (!a) return;
-      if (typeof gtag === 'function') {
-        gtag('event', 'contact_click', { tool: a.getAttribute('data-contact-tool') });
-      }
-    });
-  </script>
 </body>
 </html>
