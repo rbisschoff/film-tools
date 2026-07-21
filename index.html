@@ -26,11 +26,34 @@
   html { -webkit-text-size-adjust: 100%; }
   body {
     font-family: -apple-system, 'Inter', BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: var(--bg);
+    background: #E8F0F4;
     color: var(--ink);
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
     overflow-x: clip;
+    position: relative;
+  }
+  .page-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(
+        180deg,
+        rgba(248, 250, 252, 0.42) 0%,
+        rgba(236, 244, 248, 0.28) 42%,
+        rgba(232, 240, 244, 0.48) 100%
+      ),
+      url('assets/film-tools-beach-backdrop.jpg') left 58% / cover no-repeat;
+  }
+  .page-backdrop::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 85% 50% at 50% 12%, rgba(255,255,255,0.35), transparent 68%),
+      linear-gradient(90deg, rgba(255,255,255,0.08), transparent 22%, transparent 78%, rgba(255,255,255,0.1));
   }
   header {
     background: rgba(8,8,14,0.96);
@@ -61,28 +84,37 @@
   .brand-title { color: #fff; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
   .brand-sub { color: rgba(255,255,255,0.4); font-size: 11px; margin-top: 1px; }
   main {
+    position: relative;
+    z-index: 1;
     max-width: 720px;
     margin: 0 auto;
     padding: 24px 16px calc(40px + env(safe-area-inset-bottom));
   }
   .hero-text {
     font-size: 15px;
-    color: var(--muted);
+    color: var(--ink2);
     line-height: 1.55;
     margin-bottom: 20px;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.65);
   }
   .card {
-    background: var(--card);
-    border: none;
+    background: rgba(255, 255, 255, 0.86);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.7);
     border-radius: var(--radius-md);
     padding: 18px 16px;
     margin-bottom: 12px;
-    box-shadow: var(--shadow-card);
+    box-shadow: 0 8px 28px rgba(28, 48, 64, 0.08), 0 1px 0 rgba(255,255,255,0.9) inset;
     text-decoration: none;
     display: block;
     color: inherit;
-    transition: transform 0.15s, box-shadow 0.2s;
+    transition: transform 0.15s, box-shadow 0.2s, background 0.2s;
     -webkit-tap-highlight-color: transparent;
+  }
+  .card:hover {
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 12px 32px rgba(28, 48, 64, 0.12), 0 1px 0 rgba(255,255,255,0.95) inset;
   }
   .card:active { transform: scale(0.99); }
   .card-title {
@@ -110,9 +142,11 @@
     margin-top: 28px;
     padding: 14px 16px;
     border-radius: 12px;
-    border: 0.5px solid rgba(0, 122, 255, 0.14);
-    background: rgba(0, 122, 255, 0.05);
-    box-shadow: 0 0 0 1px rgba(0, 122, 255, 0.03), 0 0 28px rgba(0, 122, 255, 0.12);
+    border: 0.5px solid rgba(0, 122, 255, 0.16);
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 0 0 1px rgba(0, 122, 255, 0.04), 0 8px 28px rgba(0, 122, 255, 0.08);
     font-size: 14px;
     font-weight: 500;
     color: var(--ink);
@@ -133,6 +167,7 @@
 </style>
 </head>
 <body>
+  <div class="page-backdrop" aria-hidden="true"></div>
   <header>
     <div class="header-inner">
       <div class="brand-mark">フ</div>
