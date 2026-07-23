@@ -1383,14 +1383,21 @@ function buildReel() {
 
   lbl.textContent = 'Starting encoder...';
   const useVideoEncoder = typeof VideoEncoder !== 'undefined' && typeof Mp4Muxer !== 'undefined';
-  if (useVideoEncoder) {
-    buildReelMP4(timeline, totalDurationSec, progressWrap, fill, lbl).catch(err => {
-      lbl.textContent = 'MP4 failed, trying WebM... (' + err.message + ')';
-      buildReelWebM(timeline, totalDurationSec, progressWrap, fill, lbl);
-    });
-  } else {
-    buildReelWebM(timeline, totalDurationSec, progressWrap, fill, lbl);
+  if (!useVideoEncoder) {
+    failMp4Export(progressWrap, 'MP4 export needs Chrome or Edge. This browser does not support VideoEncoder.');
+    return;
   }
+  buildReelMP4(timeline, totalDurationSec, progressWrap, fill, lbl).catch(err => {
+    failMp4Export(progressWrap, 'MP4 export failed: ' + (err && err.message ? err.message : String(err)));
+  });
+}
+
+function failMp4Export(progressWrap, message) {
+  if (progressWrap) progressWrap.classList.remove('show');
+  buildReelBtn.disabled = false;
+  const wrap = document.getElementById('outputWrap');
+  wrap.classList.add('show');
+  wrap.innerHTML = `<p style="color:#c0392b;font-size:12px;padding:10px;background:#fde8e8;border-radius:8px">${message}</p>`;
 }
 
 async function buildReelMP4(timeline, totalDurationSec, progressWrap, fill, lbl) {
@@ -1442,69 +1449,6 @@ async function buildReelMP4(timeline, totalDurationSec, progressWrap, fill, lbl)
   deliverOutput(blob, 'mp4', totalDurationSec, timeline);
 }
 
-function buildReelWebM(timeline, totalDurationSec, progressWrap, fill, lbl) {
-  const { W, H, FPS, totalFrames } = timeline;
-
-  try {
-  const outCanvas = document.createElement('canvas');
-  outCanvas.width = W; outCanvas.height = H;
-  const octx = outCanvas.getContext('2d');
-
-  const mimeType = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm']
-    .find(m => MediaRecorder.isTypeSupported(m)) || 'video/webm';
-
-  const chunks = [];
-  const stream = outCanvas.captureStream(FPS);
-  const rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 10_000_000 });
-  rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-  rec.start(100);
-
-  let fi = 0;
-  function drawFrame() {
-    if (fi >= totalFrames) { rec.stop(); return; }
-    renderFrame(octx, timeline, fi);
-    fill.style.width = Math.round((fi / totalFrames) * 100) + '%';
-    lbl.textContent = `Rendering frame ${fi + 1}/${totalFrames}`;
-    fi++;
-    setTimeout(drawFrame, 1000 / FPS);
-  }
-
-  rec.onstop = async () => {
-    progressWrap.classList.remove('show');
-    lbl.textContent = 'Fixing duration...';
-    progressWrap.classList.add('show');
-
-    let blob = new Blob(chunks, { type: mimeType });
-
-    // Patch WebM duration metadata
-    try {
-      const buf = await blob.arrayBuffer();
-      const arr = new Uint8Array(buf);
-      const dv = new DataView(buf);
-      for (let i = 0; i < arr.length - 12; i++) {
-        if (arr[i] === 0x44 && arr[i+1] === 0x89) {
-          const sz = arr[i+2];
-          if (sz === 0x88) { dv.setFloat64(i+3, totalDurationSec * 1000, false); break; }
-          if (sz === 0x84) { dv.setFloat32(i+3, totalDurationSec * 1000, false); break; }
-        }
-      }
-      blob = new Blob([buf], { type: mimeType });
-    } catch(e) {}
-
-    progressWrap.classList.remove('show');
-    deliverOutput(blob, 'webm', totalDurationSec, timeline);
-  };
-
-  drawFrame();
-  } catch(err) {
-    progressWrap.classList.remove('show');
-    buildReelBtn.disabled = false;
-    const wrap = document.getElementById('outputWrap');
-    wrap.classList.add('show');
-    wrap.innerHTML = `<p style="color:#c0392b;font-size:12px;padding:10px;background:#fde8e8;border-radius:8px">Build failed: ${err.message}</p>`;
-  }
-}
-
 function deliverOutput(blob, ext, totalDurationSec, timeline) {
   const url = URL.createObjectURL(blob);
   const fn = `fuji-reel-${document.getElementById('recipe').value}-${Math.round(totalDurationSec)}s.${ext}`;
@@ -1515,7 +1459,6 @@ function deliverOutput(blob, ext, totalDurationSec, timeline) {
     <a class="dl-link" href="${url}" download="${fn}">
       Download ${ext.toUpperCase()} · 1080×1920 · ${totalDurationSec.toFixed(1)}s
     </a>
-    ${ext === 'webm' ? '<p class="note">WebM exported — if Instagram rejects it, convert to MP4 at cloudconvert.com</p>' : ''}
   `;
   buildReelBtn.disabled = false;
   renderMusicMarkers(timeline);
@@ -1957,8 +1900,7 @@ async function runDiagnostics() {
     const hasVE = typeof VideoEncoder !== 'undefined';
     const hasMux = typeof Mp4Muxer !== 'undefined';
     if (hasVE && hasMux) pass('VideoEncoder + Mp4Muxer — MP4 export ready');
-    else if (!hasVE && !hasMux) fail('MP4 encoder', 'VideoEncoder and Mp4Muxer both unavailable — WebM fallback only');
-    else fail('MP4 encoder', `VideoEncoder=${hasVE}, Mp4Muxer=${hasMux}`);
+    else fail('MP4 encoder', 'VideoEncoder/Mp4Muxer unavailable — MP4-only export requires Chrome or Edge');
   } catch(e) { fail('MP4 encoder check', e.message); }
 
   // ── 14. Build button state logic ────────────────────────────────────────
@@ -1974,15 +1916,7 @@ async function runDiagnostics() {
       fail('Build button state', `disabled=${btn.disabled}, hasGraded=${hasGraded} — mismatch`);
   } catch(e) { fail('Build button state', e.message); }
 
-  // ── 15. MediaRecorder fallback ──────────────────────────────────────────
-  try {
-    const types = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
-    const supported = types.filter(t => MediaRecorder.isTypeSupported(t));
-    if (supported.length > 0) pass(`MediaRecorder fallback — ${supported[0]}`);
-    else fail('MediaRecorder', 'no WebM codec supported — WebM fallback unavailable');
-  } catch(e) { fail('MediaRecorder', e.message); }
-
-  // ── 16. canvas.toBlob ──────────────────────────────────────────────────
+  // ── 15. canvas.toBlob ──────────────────────────────────────────────────
   await new Promise(resolve => {
     try {
       const tc = document.createElement('canvas'); tc.width=4; tc.height=4;

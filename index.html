@@ -38,14 +38,18 @@
     inset: 0;
     z-index: 0;
     pointer-events: none;
-    background:
+    background-color: #E8F0F4;
+    background-image:
       linear-gradient(
         180deg,
         rgba(248, 250, 252, 0.42) 0%,
         rgba(236, 244, 248, 0.28) 42%,
         rgba(232, 240, 244, 0.48) 100%
       ),
-      url('assets/film-tools-beach-backdrop.jpg') left 58% / cover no-repeat;
+      url('assets/film-tools-beach-backdrop.jpg');
+    background-position: left 58%;
+    background-size: cover;
+    background-repeat: no-repeat;
   }
   .page-backdrop::after {
     content: '';
@@ -137,6 +141,39 @@
     font-weight: 600;
     color: var(--accent);
     min-height: 28px;
+  }
+  @media (max-width: 720px) {
+    /* Keep the camera (bottom-left) in frame on tall phone screens. */
+    .page-backdrop {
+      background-image:
+        linear-gradient(
+          180deg,
+          rgba(248, 250, 252, 0.14) 0%,
+          rgba(236, 244, 248, 0.06) 40%,
+          rgba(232, 240, 244, 0.16) 100%
+        ),
+        url('assets/film-tools-beach-backdrop.jpg');
+      background-position: left bottom;
+      background-size: cover;
+    }
+    .page-backdrop::after {
+      background:
+        radial-gradient(ellipse 90% 36% at 50% 6%, rgba(255,255,255,0.14), transparent 72%);
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.64);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      margin-bottom: 14px;
+    }
+    .hero-text {
+      color: var(--ink);
+      text-shadow: 0 1px 2px rgba(255,255,255,0.85);
+    }
+    main {
+      /* Leave a strip of beach + camera visible under the last card. */
+      padding-bottom: calc(96px + env(safe-area-inset-bottom));
+    }
   }
   @media (max-width: 480px) {
     .brand-sub { display: none; }

@@ -915,17 +915,28 @@ document.getElementById('exportBtn').addEventListener('click', () => {
   lbl.textContent = 'Starting encoder...';
 
   const canUseMP4 = typeof VideoEncoder !== 'undefined' && typeof Mp4Muxer !== 'undefined';
-  if (canUseMP4) {
-    buildMP4(tl, progressWrap, fill, lbl).catch(err => {
-      console.warn('MP4 export failed:', err);
-      lbl.textContent = 'MP4 failed, trying WebM... (' + err.message + ')';
-      buildWebM(tl, progressWrap, fill, lbl);
-    });
-  } else {
-    lbl.textContent = 'This browser cannot encode MP4. Falling back to WebM...';
-    buildWebM(tl, progressWrap, fill, lbl);
+  if (!canUseMP4) {
+    failMp4Export(progressWrap, 'MP4 export needs Chrome or Edge. This browser does not support VideoEncoder.');
+    return;
   }
+  buildMP4(tl, progressWrap, fill, lbl).catch(err => {
+    failMp4Export(progressWrap, 'MP4 export failed: ' + (err && err.message ? err.message : String(err)));
+  });
 });
+
+function failMp4Export(progressWrap, message) {
+  if (progressWrap) progressWrap.classList.remove('show');
+  const wrap = document.getElementById('outputWrap');
+  let note = wrap.querySelector('.export-note');
+  if (!note) {
+    note = document.createElement('p');
+    note.className = 'export-note warn';
+    wrap.appendChild(note);
+  }
+  note.className = 'export-note warn';
+  note.textContent = message;
+  wrap.classList.add('show');
+}
 
 async function pickAvcCodec() {
   // Prefer Instagram-friendly Baseline / Main profiles. Even width/height already set.
@@ -1068,31 +1079,6 @@ async function buildMP4(tl, progressWrap, fill, lbl) {
   deliver(new Blob([buffer], { type: 'video/mp4' }), 'mp4');
 }
 
-function buildWebM(tl, progressWrap, fill, lbl) {
-  const out = document.createElement('canvas');
-  out.width = W; out.height = H;
-  const octx = out.getContext('2d', { alpha: false });
-  const mimeType = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
-    .find(m => MediaRecorder.isTypeSupported(m)) || 'video/webm';
-  const chunks = [];
-  const rec = new MediaRecorder(out.captureStream(FPS), { mimeType, videoBitsPerSecond: 10_000_000 });
-  rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-  rec.onstop = () => {
-    progressWrap.classList.remove('show');
-    deliver(new Blob(chunks, { type: mimeType }), 'webm');
-  };
-  rec.start(100);
-  let fi = 0;
-  (function step() {
-    if (fi >= tl.totalFrames) { rec.stop(); return; }
-    renderFrame(octx, tl, fi);
-    fill.style.width = Math.round((fi / tl.totalFrames) * 100) + '%';
-    lbl.textContent = 'Rendering frame ' + (fi + 1) + '/' + tl.totalFrames;
-    fi++;
-    setTimeout(step, 1000 / FPS);
-  })();
-}
-
 function deliver(blob, ext) {
   const url = URL.createObjectURL(blob);
   const vid = document.getElementById('outVideo');
@@ -1108,13 +1094,8 @@ function deliver(blob, ext) {
     note.className = 'export-note';
     wrap.appendChild(note);
   }
-  if (ext === 'mp4') {
-    note.className = 'export-note';
-    note.textContent = 'MP4 · 1080×1920 · ready for Instagram Reels.';
-  } else {
-    note.className = 'export-note warn';
-    note.textContent = 'This browser fell back to WebM, which Instagram rejects. Open this page in Chrome or Edge and tap Build reel again for an MP4.';
-  }
+  note.className = 'export-note';
+  note.textContent = 'MP4 · 1080×1920 · ready for Instagram Reels.';
   wrap.classList.add('show');
 }
 
