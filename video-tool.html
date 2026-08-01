@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video Tool</title>
+<style>
+  :root {
+    --bg: #0b0c0e;
+    --panel: #16181c;
+    --line: #262a30;
+    --text: #e8e9eb;
+    --muted: #8a8f98;
+    --accent: #d7d2c4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    padding: 24px 16px 60px;
+  }
+  h1 {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 20px;
+    text-align: center;
+  }
+  .layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  .stage-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  canvas {
+    width: min(320px, 80vw);
+    aspect-ratio: 9/16;
+    background: #000;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+    display: block;
+  }
+  .controls {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media (max-width: 620px) {
+    .controls { grid-template-columns: 1fr; }
+  }
+  .slot {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px;
+  }
+  .slot h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 10px;
+    font-weight: 600;
+  }
+  .file-btn {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    background: #1e2126;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 13px;
+    text-align: center;
+    cursor: pointer;
+  }
+  .file-input-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .filename {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .filter-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+  }
+  .filter-btn {
+    flex: 1;
+    padding: 8px 4px;
+    background: #1e2126;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--muted);
+    font-size: 11px;
+    cursor: pointer;
+    text-align: center;
+  }
+  .filter-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: #23262b;
+  }
+  .transport {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+  }
+  button.main {
+    padding: 11px 22px;
+    background: var(--accent);
+    color: #14151a;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.main:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+  button.ghost {
+    padding: 11px 18px;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .status {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    min-height: 16px;
+  }
+  .progress-wrap {
+    width: 100%;
+    max-width: 320px;
+    height: 4px;
+    background: #1e2126;
+    border-radius: 2px;
+    overflow: hidden;
+    display: none;
+  }
+  .progress-wrap.active { display: block; }
+  .progress-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    transition: width 0.15s linear;
+  }
+</style>
+</head>
+<body>
+
+<h1>Video Tool</h1>
+
+<div class="layout">
+  <div class="stage-wrap">
+    <canvas id="stage" width="1080" height="1920"></canvas>
+    <div class="transport">
+      <button class="ghost" id="playBtn" disabled>Play</button>
+      <button class="main" id="exportBtn" disabled>Export MP4</button>
+    </div>
+    <div class="progress-wrap" id="progressWrap"><div class="progress-bar" id="progressBar"></div></div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="controls">
+    <div class="slot">
+      <h2>Top clip</h2>
+      <label class="file-btn" id="fileTopBtn" for="fileTop">Choose video</label>
+      <input type="file" id="fileTop" accept="video/*" class="file-input-hidden">
+      <div class="filename" id="nameTop">No file selected</div>
+      <div class="filter-row" data-slot="top">
+        <div class="filter-btn active" data-filter="clean">Clean</div>
+        <div class="filter-btn" data-filter="warm">Warm</div>
+        <div class="filter-btn" data-filter="cool">Cool</div>
+      </div>
+    </div>
+
+    <div class="slot">
+      <h2>Bottom clip</h2>
+      <label class="file-btn" id="fileBottomBtn" for="fileBottom">Choose video</label>
+      <input type="file" id="fileBottom" accept="video/*" class="file-input-hidden">
+      <div class="filename" id="nameBottom">No file selected</div>
+      <div class="filter-row" data-slot="bottom">
+        <div class="filter-btn active" data-filter="clean">Clean</div>
+        <div class="filter-btn" data-filter="warm">Warm</div>
+        <div class="filter-btn" data-filter="cool">Cool</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// mp4-muxer is only loaded lazily, on export — never blocks the rest of the UI.
+let MuxerLib = null;
+async function getMuxerLib() {
+  if (MuxerLib) return MuxerLib;
+  MuxerLib = await import("https://cdn.jsdelivr.net/npm/mp4-muxer@5/build/mp4-muxer.mjs");
+  return MuxerLib;
+}
+
+// Subtle, clean filter presets. All restrained on purpose — no heavy stylization.
+const FILTERS = {
+  clean: "contrast(1.05) saturate(1.05) brightness(1.02)",
+  warm:  "contrast(1.03) saturate(0.95) sepia(0.12) brightness(1.03)",
+  cool:  "contrast(1.04) saturate(0.92) brightness(0.98) hue-rotate(-6deg)"
+};
+
+const state = {
+  top: { video: null, url: null, filter: "clean", ready: false },
+  bottom: { video: null, url: null, filter: "clean", ready: false }
+};
+
+const canvas = document.getElementById("stage");
+const ctx = canvas.getContext("2d");
+const W = canvas.width, H = canvas.height, HALF = H / 2;
+
+const playBtn = document.getElementById("playBtn");
+const exportBtn = document.getElementById("exportBtn");
+const statusEl = document.getElementById("status");
+const progressWrap = document.getElementById("progressWrap");
+const progressBar = document.getElementById("progressBar");
+
+function setStatus(msg) { statusEl.textContent = msg || ""; }
+
+function makeVideoEl() {
+  const v = document.createElement("video");
+  v.muted = true;
+  v.playsInline = true;
+  v.preload = "auto";
+  v.style.position = "absolute";
+  v.style.width = "1px";
+  v.style.height = "1px";
+  v.style.opacity = "0";
+  v.style.pointerEvents = "none";
+  document.body.appendChild(v);
+  return v;
+}
+
+function loadFile(slotName, file) {
+  const slot = state[slotName];
+  setStatus(`Loading ${file.name}...`);
+  document.getElementById(slotName === "top" ? "nameTop" : "nameBottom").textContent = file.name;
+
+  if (slot.url) URL.revokeObjectURL(slot.url);
+  if (slot.video) slot.video.remove();
+
+  let url;
+  try {
+    url = URL.createObjectURL(file);
+  } catch (err) {
+    setStatus(`Couldn't read that file: ${err.message}`);
+    return;
+  }
+
+  const v = makeVideoEl();
+  slot.video = v;
+  slot.url = url;
+  slot.ready = false;
+
+  let settled = false;
+  const markReady = () => {
+    if (settled) return;
+    settled = true;
+    slot.ready = true;
+    clearTimeout(watchdog);
+    checkReady();
+  };
+
+  v.addEventListener("loadedmetadata", markReady);
+  v.addEventListener("loadeddata", markReady);
+  v.addEventListener("canplay", markReady);
+
+  v.addEventListener("error", () => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(watchdog);
+    const err = v.error;
+    setStatus(`Couldn't load ${file.name} — ${err ? `error code ${err.code}: ${err.message}` : "unknown error"}.`);
+  });
+
+  const watchdog = setTimeout(() => {
+    if (settled) return;
+    setStatus(`Still stuck loading ${file.name} — readyState ${v.readyState}, networkState ${v.networkState}. Try a different file.`);
+  }, 5000);
+
+  v.src = url;
+  v.load();
+}
+
+function checkReady() {
+  const both = state.top.ready && state.bottom.ready;
+  playBtn.disabled = !both;
+  exportBtn.disabled = !both;
+  if (both) {
+    drawFrame();
+    setStatus("");
+  }
+}
+
+// Draw current frame of both videos into their halves, filling without letterboxing (cover crop)
+function drawHalf(video, filter, yOffset) {
+  if (!video || video.readyState < 2) return;
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if (!vw || !vh) return;
+  const targetRatio = W / HALF;
+  const srcRatio = vw / vh;
+  let sx, sy, sw, sh;
+  if (srcRatio > targetRatio) {
+    // source wider than target: crop sides
+    sh = vh;
+    sw = vh * targetRatio;
+    sx = (vw - sw) / 2;
+    sy = 0;
+  } else {
+    // source taller than target: crop top/bottom
+    sw = vw;
+    sh = vw / targetRatio;
+    sx = 0;
+    sy = (vh - sh) / 2;
+  }
+  ctx.save();
+  ctx.filter = FILTERS[filter] || "none";
+  ctx.drawImage(video, sx, sy, sw, sh, 0, yOffset, W, HALF);
+  ctx.restore();
+}
+
+function drawFrame() {
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, W, H);
+  drawHalf(state.top.video, state.top.filter, 0);
+  drawHalf(state.bottom.video, state.bottom.filter, HALF);
+}
+
+// --- File inputs ---
+// fileTopBtn/fileBottomBtn are <label for="..."> elements pointing at
+// their file inputs (see the markup above) - the browser opens the file
+// picker natively from that association, no JS click-simulation needed.
+// A button + element.click() on the hidden input is a known
+// compatibility issue on some mobile browsers (confirmed: Android
+// Chrome never opened the picker at all with that pattern).
+document.getElementById("fileTop").addEventListener("change", e => {
+  if (e.target.files && e.target.files[0]) {
+    loadFile("top", e.target.files[0]);
+  } else {
+    setStatus("No file detected from picker — try again.");
+  }
+});
+document.getElementById("fileBottom").addEventListener("change", e => {
+  if (e.target.files && e.target.files[0]) {
+    loadFile("bottom", e.target.files[0]);
+  } else {
+    setStatus("No file detected from picker — try again.");
+  }
+});
+
+// Surface any runtime error instead of failing silently
+window.addEventListener("error", (e) => {
+  setStatus("Error: " + (e.message || "something went wrong"));
+});
+
+// --- Filter buttons ---
+document.querySelectorAll(".filter-row").forEach(row => {
+  const slotName = row.dataset.slot;
+  row.querySelectorAll(".filter-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      row.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      state[slotName].filter = btn.dataset.filter;
+      if (state.top.ready && state.bottom.ready) drawFrame();
+    });
+  });
+});
+
+// --- Preview playback ---
+let playing = false;
+let rafId = null;
+
+function previewLoop() {
+  drawFrame();
+  if (playing) rafId = requestAnimationFrame(previewLoop);
+}
+
+playBtn.addEventListener("click", () => {
+  if (!state.top.ready || !state.bottom.ready) return;
+  playing = !playing;
+  playBtn.textContent = playing ? "Pause" : "Play";
+  if (playing) {
+    state.top.video.currentTime = 0;
+    state.bottom.video.currentTime = 0;
+    state.top.video.play();
+    state.bottom.video.play();
+    previewLoop();
+  } else {
+    state.top.video.pause();
+    state.bottom.video.pause();
+    cancelAnimationFrame(rafId);
+  }
+});
+
+// --- Export (frame-accurate, seek-driven, via WebCodecs + mp4-muxer) ---
+exportBtn.addEventListener("click", async () => {
+  if (!state.top.ready || !state.bottom.ready) return;
+  if (playing) { playBtn.click(); }
+
+  if (typeof VideoEncoder === "undefined") {
+    setStatus("This browser doesn't support the encoder needed for export. Try Chrome or Edge.");
+    return;
+  }
+
+  exportBtn.disabled = true;
+  playBtn.disabled = true;
+  progressWrap.classList.add("active");
+  setStatus("Loading export library...");
+
+  let Muxer, ArrayBufferTarget;
+  try {
+    const lib = await getMuxerLib();
+    Muxer = lib.Muxer;
+    ArrayBufferTarget = lib.ArrayBufferTarget;
+  } catch (err) {
+    console.error(err);
+    setStatus("Couldn't load the export library (check your internet connection) — try again.");
+    exportBtn.disabled = false;
+    playBtn.disabled = false;
+    progressWrap.classList.remove("active");
+    return;
+  }
+
+  setStatus("Preparing export...");
+
+  const fps = 30;
+  const duration = Math.min(state.top.video.duration, state.bottom.video.duration);
+  const frameCount = Math.max(1, Math.floor(duration * fps));
+
+  const muxer = new Muxer({
+    target: new ArrayBufferTarget(),
+    video: {
+      codec: "avc",
+      width: W,
+      height: H
+    },
+    fastStart: "in-memory"
+  });
+
+  const encoder = new VideoEncoder({
+    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+    error: (e) => {
+      console.error(e);
+      setStatus("Export failed: " + e.message);
+    }
+  });
+
+  encoder.configure({
+    codec: "avc1.640034",
+    width: W,
+    height: H,
+    bitrate: 10_000_000,
+    framerate: fps
+  });
+
+  async function seekTo(video, t) {
+    return new Promise(resolve => {
+      const onSeeked = () => { video.removeEventListener("seeked", onSeeked); resolve(); };
+      video.addEventListener("seeked", onSeeked);
+      video.currentTime = Math.min(t, video.duration - 0.001);
+    });
+  }
+
+  try {
+    for (let i = 0; i < frameCount; i++) {
+      const t = i / fps;
+      await Promise.all([
+        seekTo(state.top.video, t),
+        seekTo(state.bottom.video, t)
+      ]);
+      drawFrame();
+
+      const frame = new VideoFrame(canvas, {
+        timestamp: Math.round((i / fps) * 1_000_000)
+      });
+      encoder.encode(frame, { keyFrame: i % (fps * 2) === 0 });
+      frame.close();
+
+      const pct = Math.round(((i + 1) / frameCount) * 100);
+      progressBar.style.width = pct + "%";
+      setStatus(`Encoding frame ${i + 1} / ${frameCount}`);
+
+      // Yield to the UI thread periodically
+      if (i % 4 === 0) await new Promise(r => setTimeout(r, 0));
+    }
+
+    setStatus("Finalizing file...");
+    await encoder.flush();
+    muxer.finalize();
+
+    const { buffer } = muxer.target;
+    const blob = new Blob([buffer], { type: "video/mp4" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "video-tool-export.mp4";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+
+    setStatus("Done — file downloaded.");
+  } catch (err) {
+    console.error(err);
+    setStatus("Export failed: " + err.message);
+  } finally {
+    exportBtn.disabled = false;
+    playBtn.disabled = false;
+    progressWrap.classList.remove("active");
+    setTimeout(() => progressBar.style.width = "0%", 600);
+  }
+});
+</script>
+</body>
+</html>
