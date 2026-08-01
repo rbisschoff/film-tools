@@ -954,6 +954,14 @@ exportBtn.addEventListener("click", async () => {
 
   setStatus("Preparing export...");
 
+  // Every export gets its own fresh random slice of the selected track,
+  // not whatever segment preview happened to be using - otherwise
+  // repeated exports in the same session would all reuse the same few
+  // seconds of music instead of actually varying.
+  if (audioState.selectedIndex !== null) {
+    await refreshAudioSegment({ forceNewStart: true });
+  }
+
   const fps = 30;
   const duration = Math.min(state.top.video.duration, state.bottom.video.duration);
   const frameCount = Math.max(1, Math.floor(duration * fps));
