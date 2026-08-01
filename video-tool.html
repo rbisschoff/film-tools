@@ -325,6 +325,16 @@ function checkReady() {
   if (both) {
     drawFrame();
     setStatus("");
+  } else if (state.top.ready && !state.bottom.ready) {
+    // Without this, the status line is left showing whatever "Loading
+    // ...' message came last - once the top clip finishes, that stale
+    // text just sits there looking exactly like a stuck/frozen load,
+    // even though loading actually succeeded and it's simply waiting on
+    // the still-empty bottom slot (this tool needs both before it can
+    // do anything - it's not broken, just not obviously waiting).
+    setStatus("Top clip ready — choose a bottom clip to continue.");
+  } else if (state.bottom.ready && !state.top.ready) {
+    setStatus("Bottom clip ready — choose a top clip to continue.");
   }
 }
 
