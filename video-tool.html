@@ -250,6 +250,10 @@
         <label class="zoom-label" for="topZoom">Zoom <span id="topZoomValue">1.15x</span></label>
         <input type="range" id="topZoom" min="1" max="2" step="0.01" value="1.15">
       </div>
+      <div class="zoom-row">
+        <label class="zoom-label" for="topPan">Position <span id="topPanValue">Center</span></label>
+        <input type="range" id="topPan" min="-1" max="1" step="0.01" value="0">
+      </div>
     </div>
 
     <div class="slot">
@@ -265,6 +269,10 @@
       <div class="zoom-row">
         <label class="zoom-label" for="bottomZoom">Zoom <span id="bottomZoomValue">1.00x</span></label>
         <input type="range" id="bottomZoom" min="1" max="1.1" step="0.01" value="1">
+      </div>
+      <div class="zoom-row">
+        <label class="zoom-label" for="bottomPan">Position <span id="bottomPanValue">Center</span></label>
+        <input type="range" id="bottomPan" min="-1" max="1" step="0.01" value="0">
       </div>
     </div>
   </div>
@@ -287,8 +295,8 @@ const FILTERS = {
 };
 
 const state = {
-  top: { video: null, url: null, filter: "clean", ready: false, zoom: 1.15 },
-  bottom: { video: null, url: null, filter: "clean", ready: false, zoom: 1 }
+  top: { video: null, url: null, filter: "clean", ready: false, zoom: 1.15, panY: 0 },
+  bottom: { video: null, url: null, filter: "clean", ready: false, zoom: 1, panY: 0 }
 };
 
 const canvas = document.getElementById("stage");
@@ -397,8 +405,14 @@ function checkReady() {
 // letterboxing (cover crop). `zoom` (>1) tightens the crop rectangle
 // further on top of the base cover-crop, centered, so more of the
 // section is filled by less of the source - a plain "zoom in" that
-// keeps the same fill/aspect behavior, not a separate code path.
-function drawHalf(video, filter, yOffset, sectionHeight, zoom = 1) {
+// keeps the same fill/aspect behavior, not a separate code path. `panY`
+// (-1..1, 0 = centered) then slides that crop window up/down within
+// whatever vertical slack is left between it and the full source frame
+// - more zoom leaves more slack, so panning range grows with zoom. If a
+// source is wide enough that the crop already uses the full source
+// height (sh === vh, no vertical cropping happening at all), the slack
+// is zero and panY has no effect - there's nothing to move within.
+function drawHalf(video, filter, yOffset, sectionHeight, zoom = 1, panY = 0) {
   if (!video || video.readyState < 2) return;
   const vw = video.videoWidth, vh = video.videoHeight;
   if (!vw || !vh) return;
@@ -426,6 +440,10 @@ function drawHalf(video, filter, yOffset, sectionHeight, zoom = 1) {
     sw = zsw;
     sh = zsh;
   }
+  if (panY !== 0) {
+    const maxPanOffset = (vh - sh) / 2;
+    sy = Math.max(0, Math.min(vh - sh, sy + panY * maxPanOffset));
+  }
   ctx.save();
   ctx.filter = FILTERS[filter] || "none";
   ctx.drawImage(video, sx, sy, sw, sh, 0, yOffset, W, sectionHeight);
@@ -435,8 +453,8 @@ function drawHalf(video, filter, yOffset, sectionHeight, zoom = 1) {
 function drawFrame() {
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, W, H);
-  drawHalf(state.top.video, state.top.filter, 0, TOP_H, state.top.zoom);
-  drawHalf(state.bottom.video, state.bottom.filter, TOP_H, BOTTOM_H, state.bottom.zoom);
+  drawHalf(state.top.video, state.top.filter, 0, TOP_H, state.top.zoom, state.top.panY);
+  drawHalf(state.bottom.video, state.bottom.filter, TOP_H, BOTTOM_H, state.bottom.zoom, state.bottom.panY);
 }
 
 // --- File inputs ---
@@ -496,6 +514,36 @@ bottomZoomInput.addEventListener("input", () => {
   const zoom = parseFloat(bottomZoomInput.value);
   state.bottom.zoom = zoom;
   bottomZoomValue.textContent = zoom.toFixed(2) + "x";
+  if (state.top.ready && state.bottom.ready) drawFrame();
+});
+
+// --- Vertical position (pan) - lets a clip be re-centered within its
+// section's crop, e.g. to keep a subject's face in frame when the
+// default centered crop cuts it off. Only has a visible effect once
+// there's vertical crop slack to move within (see drawHalf's panY
+// comment) - e.g. a wide/landscape clip that already shows its full
+// height won't visibly move, since there's nothing to pan.
+function formatPanLabel(pan) {
+  if (Math.abs(pan) < 0.005) return "Center";
+  const pct = Math.round(Math.abs(pan) * 100);
+  return (pan < 0 ? "Up " : "Down ") + pct + "%";
+}
+
+const topPanInput = document.getElementById("topPan");
+const topPanValue = document.getElementById("topPanValue");
+topPanInput.addEventListener("input", () => {
+  const pan = parseFloat(topPanInput.value);
+  state.top.panY = pan;
+  topPanValue.textContent = formatPanLabel(pan);
+  if (state.top.ready && state.bottom.ready) drawFrame();
+});
+
+const bottomPanInput = document.getElementById("bottomPan");
+const bottomPanValue = document.getElementById("bottomPanValue");
+bottomPanInput.addEventListener("input", () => {
+  const pan = parseFloat(bottomPanInput.value);
+  state.bottom.panY = pan;
+  bottomPanValue.textContent = formatPanLabel(pan);
   if (state.top.ready && state.bottom.ready) drawFrame();
 });
 
