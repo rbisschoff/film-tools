@@ -686,6 +686,20 @@ async function refreshAudioSegment(opts = {}) {
   if (playing) startAudioPreview();
 }
 
+// Shared by both a manual file pick and a default track finishing decode:
+// select it automatically if nothing else is selected yet, or re-randomize
+// the segment if it just replaced the currently-selected track.
+function onTrackDecoded(idx) {
+  const radio = document.getElementById("audioTrackRadio" + idx);
+  if (audioState.selectedIndex === null) {
+    radio.checked = true;
+    audioState.selectedIndex = idx;
+    refreshAudioSegment({ forceNewStart: true });
+  } else if (audioState.selectedIndex === idx) {
+    refreshAudioSegment({ forceNewStart: true });
+  }
+}
+
 async function loadAudioFile(idx, file) {
   document.getElementById("nameAudio" + idx).textContent = file.name;
   setAudioStatus(`Decoding ${file.name}...`);
@@ -697,18 +711,38 @@ async function loadAudioFile(idx, file) {
     document.getElementById("nameAudio" + idx).textContent = `${file.name} — couldn't decode this file`;
     return;
   }
-  const radio = document.getElementById("audioTrackRadio" + idx);
-  if (audioState.selectedIndex === null) {
-    // First track loaded with nothing else selected yet - select it so
-    // there's something to preview/export without an extra click.
-    radio.checked = true;
-    audioState.selectedIndex = idx;
-    refreshAudioSegment({ forceNewStart: true });
-  } else if (audioState.selectedIndex === idx) {
-    // Re-loading a file into the already-selected slot: treat it as a new track.
-    refreshAudioSegment({ forceNewStart: true });
-  }
+  onTrackDecoded(idx);
 }
+
+// Three default tracks shipped in the repo (audio/) so the tool has music
+// ready to go without requiring a file pick every time - "Choose audio"
+// on any slot still overrides these with your own file. Loaded via
+// fetch(), which only works when the page is served over http(s) (as it
+// is on GitHub Pages) - opening the HTML file directly (file://) can't
+// fetch local files at all, browsers block it, so these are skipped
+// there and the slots just fall back to "Choose audio" as normal.
+const DEFAULT_TRACKS = [
+  { url: "audio/CloZee-Koto_Media.mp3", name: "CloZee — Koto" },
+  { url: "audio/Eminem-Mockingbird-Lofi.mp3", name: "Mockingbird (Lofi)" },
+  { url: "audio/Innerbloom.mp3", name: "Innerbloom" }
+];
+
+async function loadDefaultTrack(idx, url, name) {
+  document.getElementById("nameAudio" + idx).textContent = `Loading ${name}...`;
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const arrayBuffer = await resp.arrayBuffer();
+    const decoded = await getAudioCtx().decodeAudioData(arrayBuffer);
+    audioState.tracks[idx] = { file: null, decoded, name };
+    document.getElementById("nameAudio" + idx).textContent = name;
+  } catch (err) {
+    document.getElementById("nameAudio" + idx).textContent = "No file selected";
+    return;
+  }
+  onTrackDecoded(idx);
+}
+DEFAULT_TRACKS.forEach((t, idx) => loadDefaultTrack(idx, t.url, t.name));
 
 [0, 1, 2].forEach(idx => {
   document.getElementById("audio" + idx).addEventListener("change", e => {
