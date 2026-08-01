@@ -219,6 +219,83 @@
     background: var(--accent);
     transition: width 0.15s linear;
   }
+  .audio-panel {
+    width: 100%;
+    max-width: 960px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px;
+  }
+  .audio-panel h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 10px;
+    font-weight: 600;
+  }
+  .audio-slots {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  @media (max-width: 620px) {
+    .audio-slots { grid-template-columns: 1fr; }
+  }
+  .audio-slot {
+    background: #1a1c20;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 8px;
+  }
+  .audio-radio-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .audio-radio-row input[type="radio"] {
+    accent-color: var(--accent);
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    margin: 0;
+  }
+  .audio-radio-row label {
+    font-size: 11px;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .audio-slot .file-btn {
+    padding: 6px;
+    font-size: 11px;
+  }
+  .audio-slot .filename {
+    margin-top: 4px;
+  }
+  .fade-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .fade-toggle-row input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+    margin: 0;
+  }
+  .audio-status {
+    margin-top: 8px;
+    font-size: 10px;
+    color: var(--muted);
+    min-height: 12px;
+  }
 </style>
 </head>
 <body>
@@ -277,6 +354,44 @@
       </div>
     </div>
   </div>
+
+  <div class="audio-panel">
+    <h2>Background music</h2>
+    <div class="audio-slots">
+      <div class="audio-slot">
+        <div class="audio-radio-row">
+          <input type="radio" name="audioTrack" id="audioTrackRadio0" value="0">
+          <label for="audioTrackRadio0">Use this track</label>
+        </div>
+        <label class="file-btn" id="audio0Btn" for="audio0">Choose audio</label>
+        <input type="file" id="audio0" accept="audio/*" class="file-input-hidden">
+        <div class="filename" id="nameAudio0">No file selected</div>
+      </div>
+      <div class="audio-slot">
+        <div class="audio-radio-row">
+          <input type="radio" name="audioTrack" id="audioTrackRadio1" value="1">
+          <label for="audioTrackRadio1">Use this track</label>
+        </div>
+        <label class="file-btn" id="audio1Btn" for="audio1">Choose audio</label>
+        <input type="file" id="audio1" accept="audio/*" class="file-input-hidden">
+        <div class="filename" id="nameAudio1">No file selected</div>
+      </div>
+      <div class="audio-slot">
+        <div class="audio-radio-row">
+          <input type="radio" name="audioTrack" id="audioTrackRadio2" value="2">
+          <label for="audioTrackRadio2">Use this track</label>
+        </div>
+        <label class="file-btn" id="audio2Btn" for="audio2">Choose audio</label>
+        <input type="file" id="audio2" accept="audio/*" class="file-input-hidden">
+        <div class="filename" id="nameAudio2">No file selected</div>
+      </div>
+    </div>
+    <label class="fade-toggle-row">
+      <input type="checkbox" id="fadeToggle" checked>
+      <span>Fade in/out (0.5s)</span>
+    </label>
+    <div class="audio-status" id="audioStatus"></div>
+  </div>
 </div>
 
 <script>
@@ -299,6 +414,21 @@ const FILTERS = {
 const state = {
   top: { video: null, url: null, filter: "clean", ready: false, zoom: 1.15, panY: 0 },
   bottom: { video: null, url: null, filter: "clean", ready: false, zoom: 1, panY: 0 }
+};
+
+// Background music: 3 loadable tracks, one selected at a time. selectedIndex
+// picks WHICH track; the tool then picks a random start point within it
+// (startOffset) and renders that segment - trimmed to the video's exact
+// length, with fades baked in if enabled - into renderedBuffer. Both preview
+// playback and export read from that same renderedBuffer, so what you hear
+// while previewing is exactly what gets encoded into the export.
+const audioState = {
+  tracks: [null, null, null],   // { file, decoded (AudioBuffer), name } per slot
+  selectedIndex: null,
+  fade: true,
+  startOffset: null,
+  renderedBuffer: null,
+  renderedForDuration: null
 };
 
 const canvas = document.getElementById("stage");
@@ -397,6 +527,7 @@ function checkReady() {
   if (both) {
     drawFrame();
     setStatus("");
+    refreshAudioSegment();
   } else if (state.top.ready && !state.bottom.ready) {
     // Without this, the status line is left showing whatever "Loading
     // ...' message came last - once the top clip finishes, that stale
@@ -464,6 +595,159 @@ function drawFrame() {
   ctx.fillRect(0, 0, W, H);
   drawHalf(state.top.video, state.top.filter, 0, TOP_H, state.top.zoom, state.top.panY);
   drawHalf(state.bottom.video, state.bottom.filter, BOTTOM_Y, BOTTOM_H, state.bottom.zoom, state.bottom.panY);
+}
+
+// --- Background music ---
+const audioStatusEl = document.getElementById("audioStatus");
+function setAudioStatus(msg) { audioStatusEl.textContent = msg || ""; }
+
+function formatClock(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return m + ":" + String(s).padStart(2, "0");
+}
+
+// Lazily created - browsers require a user gesture before an AudioContext
+// will actually produce sound, and decodeAudioData doesn't need one, so
+// there's no reason to create this until it's first needed.
+let sharedAudioCtx = null;
+function getAudioCtx() {
+  if (!sharedAudioCtx) sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return sharedAudioCtx;
+}
+
+// Renders the exact segment [startOffset, startOffset + duration) of
+// `buffer` through an OfflineAudioContext, with a 0.5s linear fade in/out
+// baked into the samples if `fade` is on. The result is always exactly
+// `duration` seconds long (silence-padded by the source node if the track
+// is too short to fill it), so it drops straight into both the preview
+// player and the export encoder with no further trimming.
+async function renderAudioSegment(buffer, startOffset, duration, fade) {
+  const sampleRate = buffer.sampleRate;
+  const channels = buffer.numberOfChannels;
+  const offlineCtx = new OfflineAudioContext(channels, Math.ceil(duration * sampleRate), sampleRate);
+  const src = offlineCtx.createBufferSource();
+  src.buffer = buffer;
+  const gain = offlineCtx.createGain();
+  src.connect(gain);
+  gain.connect(offlineCtx.destination);
+  if (fade) {
+    const fadeLen = Math.min(0.5, duration / 2);
+    gain.gain.setValueAtTime(0, 0);
+    gain.gain.linearRampToValueAtTime(1, fadeLen);
+    gain.gain.setValueAtTime(1, Math.max(fadeLen, duration - fadeLen));
+    gain.gain.linearRampToValueAtTime(0, duration);
+  } else {
+    gain.gain.setValueAtTime(1, 0);
+  }
+  src.start(0, startOffset, duration);
+  return offlineCtx.startRendering();
+}
+
+let audioRenderToken = 0;
+
+// Recomputes the rendered audio segment for the currently selected track.
+// Picks a fresh random start point when the selection changed, a new file
+// was loaded into the selected slot, or the video's duration changed since
+// the last render (e.g. a clip got swapped) - otherwise it keeps the
+// previously-picked start so toggling fade on/off doesn't jump to a
+// different part of the track.
+async function refreshAudioSegment(opts = {}) {
+  const idx = audioState.selectedIndex;
+  if (idx === null || !audioState.tracks[idx]) {
+    audioState.renderedBuffer = null;
+    setAudioStatus("");
+    return;
+  }
+  if (!state.top.ready || !state.bottom.ready) return;
+
+  const videoDuration = Math.min(state.top.video.duration, state.bottom.video.duration);
+  const track = audioState.tracks[idx];
+  const trackDuration = track.decoded.duration;
+
+  const durationChanged = audioState.renderedForDuration !== videoDuration;
+  if (opts.forceNewStart || durationChanged || audioState.startOffset === null) {
+    const maxStart = Math.max(0, trackDuration - videoDuration);
+    audioState.startOffset = maxStart > 0 ? Math.random() * maxStart : 0;
+  }
+
+  const myToken = ++audioRenderToken;
+  setAudioStatus("Rendering audio segment...");
+  const rendered = await renderAudioSegment(track.decoded, audioState.startOffset, videoDuration, audioState.fade);
+  if (myToken !== audioRenderToken) return; // superseded by a newer selection/track/fade change
+  audioState.renderedBuffer = rendered;
+  audioState.renderedForDuration = videoDuration;
+
+  const shortNote = trackDuration < videoDuration ? " (track is shorter than the video)" : "";
+  setAudioStatus(`Using ${track.name}, ${formatClock(audioState.startOffset)}–${formatClock(audioState.startOffset + videoDuration)}${shortNote}`);
+
+  // If a loop is already playing, hand it the freshly-rendered segment
+  // right away instead of waiting for the next loop restart.
+  if (playing) startAudioPreview();
+}
+
+async function loadAudioFile(idx, file) {
+  document.getElementById("nameAudio" + idx).textContent = file.name;
+  setAudioStatus(`Decoding ${file.name}...`);
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const decoded = await getAudioCtx().decodeAudioData(arrayBuffer);
+    audioState.tracks[idx] = { file, decoded, name: file.name };
+  } catch (err) {
+    document.getElementById("nameAudio" + idx).textContent = `${file.name} — couldn't decode this file`;
+    return;
+  }
+  const radio = document.getElementById("audioTrackRadio" + idx);
+  if (audioState.selectedIndex === null) {
+    // First track loaded with nothing else selected yet - select it so
+    // there's something to preview/export without an extra click.
+    radio.checked = true;
+    audioState.selectedIndex = idx;
+    refreshAudioSegment({ forceNewStart: true });
+  } else if (audioState.selectedIndex === idx) {
+    // Re-loading a file into the already-selected slot: treat it as a new track.
+    refreshAudioSegment({ forceNewStart: true });
+  }
+}
+
+[0, 1, 2].forEach(idx => {
+  document.getElementById("audio" + idx).addEventListener("change", e => {
+    if (e.target.files && e.target.files[0]) loadAudioFile(idx, e.target.files[0]);
+  });
+  document.getElementById("audioTrackRadio" + idx).addEventListener("change", () => {
+    audioState.selectedIndex = idx;
+    refreshAudioSegment({ forceNewStart: true });
+  });
+});
+
+document.getElementById("fadeToggle").addEventListener("change", e => {
+  audioState.fade = e.target.checked;
+  refreshAudioSegment({ forceNewStart: false });
+});
+
+// --- Background music preview playback ---
+// AudioBufferSourceNodes are one-shot (can't be restarted), so every
+// (re)start of the loop gets a freshly-created node against the current
+// renderedBuffer - which also means a segment that finished re-rendering
+// mid-loop (see refreshAudioSegment above) gets picked up immediately.
+let audioSourceNode = null;
+function stopAudioPreview() {
+  if (audioSourceNode) {
+    try { audioSourceNode.stop(); } catch (err) { /* already stopped */ }
+    audioSourceNode.disconnect();
+    audioSourceNode = null;
+  }
+}
+function startAudioPreview() {
+  stopAudioPreview();
+  if (!audioState.renderedBuffer) return;
+  const ctx = getAudioCtx();
+  if (ctx.state === "suspended") ctx.resume();
+  const src = ctx.createBufferSource();
+  src.buffer = audioState.renderedBuffer;
+  src.connect(ctx.destination);
+  src.start();
+  audioSourceNode = src;
 }
 
 // --- File inputs ---
@@ -578,6 +862,9 @@ function previewLoop() {
     // already-playing video is a harmless no-op.
     state.top.video.play();
     state.bottom.video.play();
+    // The audio segment is rendered to exactly one loop's length, so a
+    // loop restart is also exactly when it needs to restart to stay synced.
+    startAudioPreview();
   }
   drawFrame();
   if (playing) rafId = requestAnimationFrame(previewLoop);
@@ -592,10 +879,12 @@ playBtn.addEventListener("click", () => {
     state.bottom.video.currentTime = 0;
     state.top.video.play();
     state.bottom.video.play();
+    startAudioPreview();
     previewLoop();
   } else {
     state.top.video.pause();
     state.bottom.video.pause();
+    stopAudioPreview();
     cancelAnimationFrame(rafId);
   }
 });
@@ -635,7 +924,67 @@ exportBtn.addEventListener("click", async () => {
   const duration = Math.min(state.top.video.duration, state.bottom.video.duration);
   const frameCount = Math.max(1, Math.floor(duration * fps));
 
-  const muxer = new Muxer({
+  // Audio is only baked in if a track is selected and its segment has
+  // finished rendering (see refreshAudioSegment) - otherwise this exports
+  // video-only, same as before background music existed. Encoded fully
+  // *before* the Muxer is created (and only added to its config on
+  // success) so a mid-encode failure can't leave the Muxer declaring an
+  // audio track it never actually receives samples for - AudioEncoder
+  // failures are rare (Chrome that supports the VideoEncoder codec used
+  // above supports AAC too) but a malformed output file isn't an
+  // acceptable way to find that out.
+  const audioBuffer = audioState.renderedBuffer;
+  let hasAudio = false;
+  let audioChunks = [];
+  if (audioBuffer && typeof AudioEncoder !== "undefined") {
+    setStatus("Encoding audio...");
+    try {
+      const audioEncoder = new AudioEncoder({
+        output: (chunk, meta) => audioChunks.push({ chunk, meta }),
+        error: (e) => console.error("Audio encode error:", e)
+      });
+      audioEncoder.configure({
+        codec: "mp4a.40.2",
+        numberOfChannels: audioBuffer.numberOfChannels,
+        sampleRate: audioBuffer.sampleRate,
+        bitrate: 128_000
+      });
+
+      const channelData = [];
+      for (let c = 0; c < audioBuffer.numberOfChannels; c++) {
+        channelData.push(audioBuffer.getChannelData(c));
+      }
+      const FRAME_SIZE = 4096;
+      for (let offset = 0; offset < audioBuffer.length; offset += FRAME_SIZE) {
+        const frames = Math.min(FRAME_SIZE, audioBuffer.length - offset);
+        const planar = new Float32Array(frames * audioBuffer.numberOfChannels);
+        for (let c = 0; c < audioBuffer.numberOfChannels; c++) {
+          planar.set(channelData[c].subarray(offset, offset + frames), c * frames);
+        }
+        const audioData = new AudioData({
+          format: "f32-planar",
+          sampleRate: audioBuffer.sampleRate,
+          numberOfFrames: frames,
+          numberOfChannels: audioBuffer.numberOfChannels,
+          timestamp: Math.round((offset / audioBuffer.sampleRate) * 1_000_000),
+          data: planar
+        });
+        audioEncoder.encode(audioData);
+        audioData.close();
+      }
+      await audioEncoder.flush();
+      hasAudio = true;
+    } catch (err) {
+      // Audio is a bonus on top of the video export, not a hard
+      // requirement - if AAC encoding fails, fall back to a video-only
+      // export rather than losing the whole clip over it.
+      console.error(err);
+      audioChunks = [];
+      hasAudio = false;
+    }
+  }
+
+  const muxerConfig = {
     target: new ArrayBufferTarget(),
     video: {
       codec: "avc",
@@ -643,7 +992,18 @@ exportBtn.addEventListener("click", async () => {
       height: H
     },
     fastStart: "in-memory"
-  });
+  };
+  if (hasAudio) {
+    muxerConfig.audio = {
+      codec: "aac",
+      numberOfChannels: audioBuffer.numberOfChannels,
+      sampleRate: audioBuffer.sampleRate
+    };
+  }
+  const muxer = new Muxer(muxerConfig);
+  if (hasAudio) {
+    for (const { chunk, meta } of audioChunks) muxer.addAudioChunk(chunk, meta);
+  }
 
   const encoder = new VideoEncoder({
     output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
