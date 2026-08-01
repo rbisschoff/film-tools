@@ -125,6 +125,48 @@
     color: var(--accent);
     background: #23262b;
   }
+  .zoom-row {
+    margin-top: 12px;
+  }
+  .zoom-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .zoom-label span {
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .zoom-row input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: #1e2126;
+    border: 1px solid var(--line);
+    outline: none;
+    cursor: pointer;
+  }
+  .zoom-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+  .zoom-row input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    cursor: pointer;
+  }
   .transport {
     display: flex;
     gap: 10px;
@@ -204,6 +246,10 @@
         <div class="filter-btn" data-filter="warm">Warm</div>
         <div class="filter-btn" data-filter="cool">Cool</div>
       </div>
+      <div class="zoom-row">
+        <label class="zoom-label" for="topZoom">Zoom <span id="topZoomValue">1.15x</span></label>
+        <input type="range" id="topZoom" min="1" max="2" step="0.01" value="1.15">
+      </div>
     </div>
 
     <div class="slot">
@@ -237,13 +283,18 @@ const FILTERS = {
 };
 
 const state = {
-  top: { video: null, url: null, filter: "clean", ready: false },
+  top: { video: null, url: null, filter: "clean", ready: false, zoom: 1.15 },
   bottom: { video: null, url: null, filter: "clean", ready: false }
 };
 
 const canvas = document.getElementById("stage");
 const ctx = canvas.getContext("2d");
-const W = canvas.width, H = canvas.height, HALF = H / 2;
+const W = canvas.width, H = canvas.height;
+// Top gets 1/3 of the frame, bottom the remaining 2/3 - BOTTOM_H is
+// derived as H - TOP_H (not H * 2/3) so the two sections always add up
+// to exactly H with no rounding gap, whatever the canvas size is.
+const TOP_H = H / 3;
+const BOTTOM_H = H - TOP_H;
 
 const playBtn = document.getElementById("playBtn");
 const exportBtn = document.getElementById("exportBtn");
@@ -338,12 +389,16 @@ function checkReady() {
   }
 }
 
-// Draw current frame of both videos into their halves, filling without letterboxing (cover crop)
-function drawHalf(video, filter, yOffset) {
+// Draw current frame of both videos into their sections, filling without
+// letterboxing (cover crop). `zoom` (>1) tightens the crop rectangle
+// further on top of the base cover-crop, centered, so more of the
+// section is filled by less of the source - a plain "zoom in" that
+// keeps the same fill/aspect behavior, not a separate code path.
+function drawHalf(video, filter, yOffset, sectionHeight, zoom = 1) {
   if (!video || video.readyState < 2) return;
   const vw = video.videoWidth, vh = video.videoHeight;
   if (!vw || !vh) return;
-  const targetRatio = W / HALF;
+  const targetRatio = W / sectionHeight;
   const srcRatio = vw / vh;
   let sx, sy, sw, sh;
   if (srcRatio > targetRatio) {
@@ -359,17 +414,25 @@ function drawHalf(video, filter, yOffset) {
     sx = 0;
     sy = (vh - sh) / 2;
   }
+  if (zoom !== 1) {
+    const zsw = sw / zoom;
+    const zsh = sh / zoom;
+    sx += (sw - zsw) / 2;
+    sy += (sh - zsh) / 2;
+    sw = zsw;
+    sh = zsh;
+  }
   ctx.save();
   ctx.filter = FILTERS[filter] || "none";
-  ctx.drawImage(video, sx, sy, sw, sh, 0, yOffset, W, HALF);
+  ctx.drawImage(video, sx, sy, sw, sh, 0, yOffset, W, sectionHeight);
   ctx.restore();
 }
 
 function drawFrame() {
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, W, H);
-  drawHalf(state.top.video, state.top.filter, 0);
-  drawHalf(state.bottom.video, state.bottom.filter, HALF);
+  drawHalf(state.top.video, state.top.filter, 0, TOP_H, state.top.zoom);
+  drawHalf(state.bottom.video, state.bottom.filter, TOP_H, BOTTOM_H);
 }
 
 // --- File inputs ---
@@ -410,6 +473,16 @@ document.querySelectorAll(".filter-row").forEach(row => {
       if (state.top.ready && state.bottom.ready) drawFrame();
     });
   });
+});
+
+// --- Top clip zoom ---
+const topZoomInput = document.getElementById("topZoom");
+const topZoomValue = document.getElementById("topZoomValue");
+topZoomInput.addEventListener("input", () => {
+  const zoom = parseFloat(topZoomInput.value);
+  state.top.zoom = zoom;
+  topZoomValue.textContent = zoom.toFixed(2) + "x";
+  if (state.top.ready && state.bottom.ready) drawFrame();
 });
 
 // --- Preview playback ---
