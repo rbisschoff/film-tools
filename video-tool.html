@@ -262,6 +262,10 @@
         <div class="filter-btn" data-filter="warm">Warm</div>
         <div class="filter-btn" data-filter="cool">Cool</div>
       </div>
+      <div class="zoom-row">
+        <label class="zoom-label" for="bottomZoom">Zoom <span id="bottomZoomValue">1.00x</span></label>
+        <input type="range" id="bottomZoom" min="1" max="1.1" step="0.01" value="1">
+      </div>
     </div>
   </div>
 </div>
@@ -284,7 +288,7 @@ const FILTERS = {
 
 const state = {
   top: { video: null, url: null, filter: "clean", ready: false, zoom: 1.15 },
-  bottom: { video: null, url: null, filter: "clean", ready: false }
+  bottom: { video: null, url: null, filter: "clean", ready: false, zoom: 1 }
 };
 
 const canvas = document.getElementById("stage");
@@ -432,7 +436,7 @@ function drawFrame() {
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, W, H);
   drawHalf(state.top.video, state.top.filter, 0, TOP_H, state.top.zoom);
-  drawHalf(state.bottom.video, state.bottom.filter, TOP_H, BOTTOM_H);
+  drawHalf(state.bottom.video, state.bottom.filter, TOP_H, BOTTOM_H, state.bottom.zoom);
 }
 
 // --- File inputs ---
@@ -482,6 +486,16 @@ topZoomInput.addEventListener("input", () => {
   const zoom = parseFloat(topZoomInput.value);
   state.top.zoom = zoom;
   topZoomValue.textContent = zoom.toFixed(2) + "x";
+  if (state.top.ready && state.bottom.ready) drawFrame();
+});
+
+// --- Bottom clip zoom ---
+const bottomZoomInput = document.getElementById("bottomZoom");
+const bottomZoomValue = document.getElementById("bottomZoomValue");
+bottomZoomInput.addEventListener("input", () => {
+  const zoom = parseFloat(bottomZoomInput.value);
+  state.bottom.zoom = zoom;
+  bottomZoomValue.textContent = zoom.toFixed(2) + "x";
   if (state.top.ready && state.bottom.ready) drawFrame();
 });
 
