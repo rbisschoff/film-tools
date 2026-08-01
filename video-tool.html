@@ -281,9 +281,9 @@ async function getMuxerLib() {
 
 // Subtle, clean filter presets. All restrained on purpose — no heavy stylization.
 const FILTERS = {
-  clean: "contrast(1.05) saturate(1.05) brightness(1.02)",
-  warm:  "contrast(1.03) saturate(0.95) sepia(0.12) brightness(1.03)",
-  cool:  "contrast(1.04) saturate(0.92) brightness(0.98) hue-rotate(-6deg)"
+  clean: "contrast(1.02) saturate(1.02) brightness(1.005)",
+  warm:  "contrast(1.015) saturate(0.98) sepia(0.05) brightness(1.01)",
+  cool:  "contrast(1.015) saturate(0.97) brightness(0.995) hue-rotate(-3deg)"
 };
 
 const state = {
@@ -504,6 +504,24 @@ let playing = false;
 let rafId = null;
 
 function previewLoop() {
+  // Export already trims to the shorter clip's duration (see
+  // Math.min(...) below) - without this, preview just let each clip run
+  // to its own natural end instead, so a mismatched pair looked wrong
+  // (the shorter one freezing on its last frame while the longer one
+  // kept going). Looping both back together at the shared duration
+  // keeps preview an honest match for what actually gets exported.
+  const syncedDuration = Math.min(state.top.video.duration, state.bottom.video.duration);
+  if (state.top.video.currentTime >= syncedDuration || state.bottom.video.currentTime >= syncedDuration) {
+    state.top.video.currentTime = 0;
+    state.bottom.video.currentTime = 0;
+    // Whichever clip is shorter reaches its own natural end first, which
+    // auto-pauses it (standard <video> behavior) - resetting currentTime
+    // alone doesn't resume it, so without this it just freezes on frame
+    // 0 forever while the longer clip keeps going. .play() on an
+    // already-playing video is a harmless no-op.
+    state.top.video.play();
+    state.bottom.video.play();
+  }
   drawFrame();
   if (playing) rafId = requestAnimationFrame(previewLoop);
 }
