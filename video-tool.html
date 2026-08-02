@@ -62,6 +62,11 @@
     .zoom-label { font-size: 9px; margin-bottom: 3px; }
     .zoom-row input[type="range"]::-webkit-slider-thumb { width: 13px; height: 13px; }
     .zoom-row input[type="range"]::-moz-range-thumb { width: 13px; height: 13px; }
+    .trim-row { margin-top: 6px; }
+    .trim-inputs input[type="number"] { padding: 4px 5px; font-size: 10px; }
+    .trim-sep { font-size: 10px; }
+    .output-mode-row { gap: 8px; }
+    .output-mode-row label { font-size: 11px; }
   }
   .slot {
     background: var(--panel);
@@ -167,6 +172,29 @@
     background: var(--accent);
     border: none;
     cursor: pointer;
+  }
+  .trim-row {
+    margin-top: 8px;
+  }
+  .trim-inputs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .trim-inputs input[type="number"] {
+    flex: 1;
+    min-width: 0;
+    padding: 5px 6px;
+    background: #1e2126;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+  .trim-sep {
+    color: var(--muted);
+    font-size: 11px;
   }
   .transport {
     display: flex;
@@ -296,6 +324,63 @@
     color: var(--muted);
     min-height: 12px;
   }
+  .output-panel {
+    width: 100%;
+    max-width: 960px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px;
+  }
+  .output-panel h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 10px;
+    font-weight: 600;
+  }
+  .output-mode-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .output-mode-row label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .output-mode-row input[type="radio"] {
+    accent-color: var(--accent);
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    margin: 0;
+  }
+  .output-custom-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .output-custom-row[hidden] {
+    display: none;
+  }
+  .output-custom-row input[type="number"] {
+    width: 70px;
+    padding: 5px 6px;
+    background: #1e2126;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
 </style>
 </head>
 <body>
@@ -331,6 +416,14 @@
         <label class="zoom-label" for="topPan">Position <span id="topPanValue">Center</span></label>
         <input type="range" id="topPan" min="-1" max="1" step="0.01" value="0">
       </div>
+      <div class="trim-row">
+        <label class="zoom-label">Trim <span id="topTrimValue">0:00–0:00</span></label>
+        <div class="trim-inputs">
+          <input type="number" id="topTrimStart" min="0" step="0.1" value="0">
+          <span class="trim-sep">–</span>
+          <input type="number" id="topTrimEnd" min="0" step="0.1" value="0">
+        </div>
+      </div>
     </div>
 
     <div class="slot">
@@ -352,6 +445,27 @@
         <label class="zoom-label" for="bottomPan">Position <span id="bottomPanValue">Center</span></label>
         <input type="range" id="bottomPan" min="-1" max="1" step="0.01" value="0">
       </div>
+      <div class="trim-row">
+        <label class="zoom-label">Trim <span id="bottomTrimValue">0:00–0:00</span></label>
+        <div class="trim-inputs">
+          <input type="number" id="bottomTrimStart" min="0" step="0.1" value="0">
+          <span class="trim-sep">–</span>
+          <input type="number" id="bottomTrimEnd" min="0" step="0.1" value="0">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="output-panel">
+    <h2>Output length</h2>
+    <div class="output-mode-row">
+      <label><input type="radio" name="outputMode" value="shorter" checked> Match shorter clip</label>
+      <label><input type="radio" name="outputMode" value="longer"> Match longer clip</label>
+      <label><input type="radio" name="outputMode" value="custom"> Custom</label>
+    </div>
+    <div class="output-custom-row" id="outputCustomRow" hidden>
+      <input type="number" id="outputCustomSeconds" min="1" max="60" step="0.5" value="6">
+      <span>seconds</span>
     </div>
   </div>
 
@@ -412,9 +526,26 @@ const FILTERS = {
 };
 
 const state = {
-  top: { video: null, url: null, filter: "clean", ready: false, zoom: 1.15, panY: 0 },
-  bottom: { video: null, url: null, filter: "clean", ready: false, zoom: 1, panY: 0 }
+  top: { video: null, url: null, filter: "clean", ready: false, zoom: 1.15, panY: 0, duration: 0, trimStart: 0, trimEnd: 0 },
+  bottom: { video: null, url: null, filter: "clean", ready: false, zoom: 1, panY: 0, duration: 0, trimStart: 0, trimEnd: 0 }
 };
+
+const MIN_TRIM_LENGTH = 0.5;
+
+// Output length: "shorter"/"longer" derive it from each clip's own
+// trimmed length (end - start); "custom" uses a fixed seconds value
+// instead. Whichever clip's trimmed segment is shorter than this loops
+// to fill it, and whichever is longer gets truncated - see sourceTimeFor
+// in the export handler below for exactly how.
+const outputState = { mode: "shorter", customSeconds: 6 };
+
+function getOutputDuration() {
+  const topLen = state.top.trimEnd - state.top.trimStart;
+  const bottomLen = state.bottom.trimEnd - state.bottom.trimStart;
+  if (outputState.mode === "longer") return Math.max(topLen, bottomLen);
+  if (outputState.mode === "custom") return Math.max(1, Math.min(60, outputState.customSeconds));
+  return Math.min(topLen, bottomLen);
+}
 
 // Background music: 3 loadable tracks, one selected at a time. selectedIndex
 // picks WHICH track; the tool then picks a random start point within it
@@ -427,8 +558,7 @@ const audioState = {
   selectedIndex: null,
   fade: true,
   startOffset: null,
-  renderedBuffer: null,
-  renderedForDuration: null
+  renderedBuffer: null
 };
 
 const canvas = document.getElementById("stage");
@@ -499,6 +629,15 @@ function loadFile(slotName, file) {
     checkReady();
   };
 
+  // Trim range resets fresh for every new file, including a re-upload
+  // replacing the previous one - there's no case where a stale trim
+  // range from a different clip should carry over onto a new duration.
+  v.addEventListener("loadedmetadata", () => {
+    slot.duration = v.duration;
+    slot.trimStart = 0;
+    slot.trimEnd = v.duration;
+    updateTrimInputs(slotName);
+  });
   v.addEventListener("loadedmetadata", markReady);
   v.addEventListener("loadeddata", markReady);
   v.addEventListener("canplay", markReady);
@@ -520,10 +659,22 @@ function loadFile(slotName, file) {
   v.load();
 }
 
+// Export needs both clips loaded *and* both trim ranges non-zero - the
+// latter should always hold true by construction (trim inputs are
+// clamped to a 0.5s minimum as soon as a clip's duration is known), but
+// this is the single source of truth either way rather than trusting
+// that invariant silently.
+function updateExportAvailability() {
+  const both = state.top.ready && state.bottom.ready;
+  const topValid = (state.top.trimEnd - state.top.trimStart) > 0;
+  const bottomValid = (state.bottom.trimEnd - state.bottom.trimStart) > 0;
+  exportBtn.disabled = !(both && topValid && bottomValid);
+}
+
 function checkReady() {
   const both = state.top.ready && state.bottom.ready;
   playBtn.disabled = !both;
-  exportBtn.disabled = !both;
+  updateExportAvailability();
   if (both) {
     drawFrame();
     setStatus("");
@@ -646,12 +797,14 @@ async function renderAudioSegment(buffer, startOffset, duration, fade) {
 
 let audioRenderToken = 0;
 
-// Recomputes the rendered audio segment for the currently selected track.
-// Picks a fresh random start point when the selection changed, a new file
-// was loaded into the selected slot, or the video's duration changed since
-// the last render (e.g. a clip got swapped) - otherwise it keeps the
-// previously-picked start so toggling fade on/off doesn't jump to a
-// different part of the track.
+// Recomputes the rendered audio segment for the currently selected track,
+// matched to the current output length (see getOutputDuration - trim and
+// output-mode changes both affect this). Picks a fresh random start point
+// only when explicitly asked to (a new track/file selection, or a fresh
+// export) - a duration-only change (trim/output-length nudge) instead
+// just clamps the *existing* start point so it still leaves enough of the
+// track to cover the new length, rather than jumping to a different part
+// of the song on every minor slider adjustment.
 async function refreshAudioSegment(opts = {}) {
   const idx = audioState.selectedIndex;
   if (idx === null || !audioState.tracks[idx]) {
@@ -661,25 +814,31 @@ async function refreshAudioSegment(opts = {}) {
   }
   if (!state.top.ready || !state.bottom.ready) return;
 
-  const videoDuration = Math.min(state.top.video.duration, state.bottom.video.duration);
+  const outputDuration = getOutputDuration();
+  if (outputDuration <= 0) {
+    audioState.renderedBuffer = null;
+    setAudioStatus("");
+    return;
+  }
+
   const track = audioState.tracks[idx];
   const trackDuration = track.decoded.duration;
+  const maxStart = Math.max(0, trackDuration - outputDuration);
 
-  const durationChanged = audioState.renderedForDuration !== videoDuration;
-  if (opts.forceNewStart || durationChanged || audioState.startOffset === null) {
-    const maxStart = Math.max(0, trackDuration - videoDuration);
+  if (opts.forceNewStart || audioState.startOffset === null) {
     audioState.startOffset = maxStart > 0 ? Math.random() * maxStart : 0;
+  } else {
+    audioState.startOffset = Math.min(audioState.startOffset, maxStart);
   }
 
   const myToken = ++audioRenderToken;
   setAudioStatus("Rendering audio segment...");
-  const rendered = await renderAudioSegment(track.decoded, audioState.startOffset, videoDuration, audioState.fade);
-  if (myToken !== audioRenderToken) return; // superseded by a newer selection/track/fade change
+  const rendered = await renderAudioSegment(track.decoded, audioState.startOffset, outputDuration, audioState.fade);
+  if (myToken !== audioRenderToken) return; // superseded by a newer selection/track/fade/output change
   audioState.renderedBuffer = rendered;
-  audioState.renderedForDuration = videoDuration;
 
-  const shortNote = trackDuration < videoDuration ? " (track is shorter than the video)" : "";
-  setAudioStatus(`Using ${track.name}, ${formatClock(audioState.startOffset)}–${formatClock(audioState.startOffset + videoDuration)}${shortNote}`);
+  const shortNote = trackDuration < outputDuration ? " (track is shorter than the output length)" : "";
+  setAudioStatus(`Using ${track.name}, ${formatClock(audioState.startOffset)}–${formatClock(audioState.startOffset + outputDuration)}${shortNote}`);
 
   // If a loop is already playing, hand it the freshly-rendered segment
   // right away instead of waiting for the next loop restart.
@@ -780,6 +939,16 @@ function startAudioPreview() {
   const src = ctx.createBufferSource();
   src.buffer = audioState.renderedBuffer;
   src.connect(ctx.destination);
+  // Each clip now loops independently within its own trim range (see
+  // previewLoop below), so there's no single shared video-reset moment to
+  // hang audio looping off of anymore - it just loops on its own natural
+  // length instead, which is exactly the output length since that's what
+  // it was rendered to. `onended` also fires from a manual .stop() (e.g.
+  // pausing), so the identity check here is what stops that from
+  // triggering an unwanted restart.
+  src.onended = () => {
+    if (audioSourceNode === src && playing) startAudioPreview();
+  };
   src.start();
   audioSourceNode = src;
 }
@@ -874,31 +1043,122 @@ bottomPanInput.addEventListener("input", () => {
   if (state.top.ready && state.bottom.ready) drawFrame();
 });
 
+// --- Per-clip trim range ---
+function updateTrimLabel(slotName) {
+  const slot = state[slotName];
+  document.getElementById(slotName + "TrimValue").textContent =
+    `${formatClock(slot.trimStart)}–${formatClock(slot.trimEnd)}`;
+}
+
+function updateTrimInputs(slotName) {
+  const slot = state[slotName];
+  const startInput = document.getElementById(slotName + "TrimStart");
+  const endInput = document.getElementById(slotName + "TrimEnd");
+  startInput.max = slot.duration.toFixed(1);
+  endInput.max = slot.duration.toFixed(1);
+  startInput.value = slot.trimStart.toFixed(1);
+  endInput.value = slot.trimEnd.toFixed(1);
+  updateTrimLabel(slotName);
+}
+
+// Seeks a (paused) video and redraws once the seek lands, so adjusting a
+// trim handle gives immediate visual feedback on the canvas even while
+// not playing - same pattern already used for zoom/pan, just via a seek
+// first since trim needs a specific frame rather than the current one.
+function seekAndRedraw(video, t) {
+  const onSeeked = () => {
+    video.removeEventListener("seeked", onSeeked);
+    if (!playing) drawFrame();
+  };
+  video.addEventListener("seeked", onSeeked);
+  video.currentTime = Math.max(0, Math.min(t, video.duration - 0.001));
+}
+
+// Clamps start < end with a minimum 0.5s gap (or the clip's whole
+// duration if it's even shorter than that) - whichever handle was just
+// edited "wins", pushing the other one along with it rather than
+// silently refusing the edit.
+function handleTrimChange(slotName, which) {
+  const slot = state[slotName];
+  const duration = slot.duration || 0;
+  const startInput = document.getElementById(slotName + "TrimStart");
+  const endInput = document.getElementById(slotName + "TrimEnd");
+  const minLen = Math.min(MIN_TRIM_LENGTH, duration);
+
+  let start = parseFloat(startInput.value);
+  let end = parseFloat(endInput.value);
+  if (Number.isNaN(start)) start = slot.trimStart;
+  if (Number.isNaN(end)) end = slot.trimEnd;
+  start = Math.max(0, Math.min(start, duration));
+  end = Math.max(0, Math.min(end, duration));
+
+  if (which === "start") {
+    start = Math.min(start, duration - minLen);
+    end = Math.max(end, start + minLen);
+  } else {
+    end = Math.max(end, minLen);
+    start = Math.min(start, end - minLen);
+  }
+  start = Math.max(0, start);
+  end = Math.min(duration, end);
+
+  slot.trimStart = start;
+  slot.trimEnd = end;
+  startInput.value = start.toFixed(1);
+  endInput.value = end.toFixed(1);
+  updateTrimLabel(slotName);
+
+  if (slot.video && slot.ready) {
+    seekAndRedraw(slot.video, which === "start" ? start : Math.max(start, end - 0.05));
+  }
+
+  updateExportAvailability();
+  if (state.top.ready && state.bottom.ready) refreshAudioSegment({ forceNewStart: false });
+}
+
+document.getElementById("topTrimStart").addEventListener("input", () => handleTrimChange("top", "start"));
+document.getElementById("topTrimEnd").addEventListener("input", () => handleTrimChange("top", "end"));
+document.getElementById("bottomTrimStart").addEventListener("input", () => handleTrimChange("bottom", "start"));
+document.getElementById("bottomTrimEnd").addEventListener("input", () => handleTrimChange("bottom", "end"));
+
+// --- Output length ---
+document.getElementById("outputCustomRow").hidden = outputState.mode !== "custom";
+document.querySelectorAll('input[name="outputMode"]').forEach(radio => {
+  radio.addEventListener("change", () => {
+    if (!radio.checked) return;
+    outputState.mode = radio.value;
+    document.getElementById("outputCustomRow").hidden = outputState.mode !== "custom";
+    if (state.top.ready && state.bottom.ready) refreshAudioSegment({ forceNewStart: false });
+  });
+});
+
+const outputCustomInput = document.getElementById("outputCustomSeconds");
+outputCustomInput.addEventListener("input", () => {
+  const v = parseFloat(outputCustomInput.value);
+  if (!Number.isNaN(v)) outputState.customSeconds = Math.max(1, Math.min(60, v));
+  if (state.top.ready && state.bottom.ready) refreshAudioSegment({ forceNewStart: false });
+});
+
 // --- Preview playback ---
 let playing = false;
 let rafId = null;
 
+// Each clip loops independently within its own trim range - whichever
+// one reaches its trimEnd gets reset back to its own trimStart and kept
+// playing, with no dependency on what the other clip is doing. (Audio
+// loops separately too, on the output length - see startAudioPreview.)
 function previewLoop() {
-  // Export already trims to the shorter clip's duration (see
-  // Math.min(...) below) - without this, preview just let each clip run
-  // to its own natural end instead, so a mismatched pair looked wrong
-  // (the shorter one freezing on its last frame while the longer one
-  // kept going). Looping both back together at the shared duration
-  // keeps preview an honest match for what actually gets exported.
-  const syncedDuration = Math.min(state.top.video.duration, state.bottom.video.duration);
-  if (state.top.video.currentTime >= syncedDuration || state.bottom.video.currentTime >= syncedDuration) {
-    state.top.video.currentTime = 0;
-    state.bottom.video.currentTime = 0;
-    // Whichever clip is shorter reaches its own natural end first, which
-    // auto-pauses it (standard <video> behavior) - resetting currentTime
-    // alone doesn't resume it, so without this it just freezes on frame
-    // 0 forever while the longer clip keeps going. .play() on an
-    // already-playing video is a harmless no-op.
+  if (state.top.video.currentTime >= state.top.trimEnd) {
+    state.top.video.currentTime = state.top.trimStart;
+    // Reaching its own natural end (trimEnd === the clip's real duration)
+    // auto-pauses a video (standard <video> behavior) - resetting
+    // currentTime alone doesn't resume it. .play() on an already-playing
+    // video is a harmless no-op, so this is safe to call unconditionally.
     state.top.video.play();
+  }
+  if (state.bottom.video.currentTime >= state.bottom.trimEnd) {
+    state.bottom.video.currentTime = state.bottom.trimStart;
     state.bottom.video.play();
-    // The audio segment is rendered to exactly one loop's length, so a
-    // loop restart is also exactly when it needs to restart to stay synced.
-    startAudioPreview();
   }
   drawFrame();
   if (playing) rafId = requestAnimationFrame(previewLoop);
@@ -909,8 +1169,8 @@ playBtn.addEventListener("click", () => {
   playing = !playing;
   playBtn.textContent = playing ? "Pause" : "Play";
   if (playing) {
-    state.top.video.currentTime = 0;
-    state.bottom.video.currentTime = 0;
+    state.top.video.currentTime = state.top.trimStart;
+    state.bottom.video.currentTime = state.bottom.trimStart;
     state.top.video.play();
     state.bottom.video.play();
     startAudioPreview();
@@ -963,8 +1223,21 @@ exportBtn.addEventListener("click", async () => {
   }
 
   const fps = 30;
-  const duration = Math.min(state.top.video.duration, state.bottom.video.duration);
-  const frameCount = Math.max(1, Math.floor(duration * fps));
+  const outputDuration = getOutputDuration();
+  const frameCount = Math.max(1, Math.floor(outputDuration * fps));
+
+  // Maps an overall output-timeline position `t` (0..outputDuration) to a
+  // source-video time within [trimStart, trimEnd): if the trimmed clip is
+  // shorter than the output, `t % trimmedLength` wraps back around -
+  // looping it to fill the remaining time. If it's longer, `t` never
+  // reaches trimmedLength so this never wraps - it just plays straight
+  // through and gets truncated at outputDuration. One formula covers
+  // both the "loop to fill" and "truncate" cases.
+  function sourceTimeFor(slot, t) {
+    const trimmedLength = slot.trimEnd - slot.trimStart;
+    if (trimmedLength <= 0) return slot.trimStart;
+    return slot.trimStart + (t % trimmedLength);
+  }
 
   // Audio is only baked in if a track is selected and its segment has
   // finished rendering (see refreshAudioSegment) - otherwise this exports
@@ -1075,8 +1348,8 @@ exportBtn.addEventListener("click", async () => {
     for (let i = 0; i < frameCount; i++) {
       const t = i / fps;
       await Promise.all([
-        seekTo(state.top.video, t),
-        seekTo(state.bottom.video, t)
+        seekTo(state.top.video, sourceTimeFor(state.top, t)),
+        seekTo(state.bottom.video, sourceTimeFor(state.bottom, t))
       ]);
       drawFrame();
 
