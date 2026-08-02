@@ -937,6 +937,19 @@ function loadFile(slotName, file) {
     slot.trimEnd = v.duration;
     v.playbackRate = slot.speed;
     updateTrimInputs(slotName);
+
+    // The top slot's 1.15x default zoom is tuned for portrait sources -
+    // its own section shape is fairly wide (close to 16:9) already, so a
+    // landscape source needs barely any cropping to fill it (confirmed:
+    // ~30px per side), and the extra zoom just cuts real top/bottom
+    // framing that didn't need cutting. The bottom slot's 1.0 default
+    // already works fine for either orientation, so only top needs this.
+    if (slotName === "top") {
+      const isLandscape = v.videoWidth > v.videoHeight;
+      slot.zoom = isLandscape ? 1 : 1.15;
+      topZoomInput.value = String(slot.zoom);
+      topZoomValue.textContent = slot.zoom.toFixed(2) + "x";
+    }
   });
   v.addEventListener("loadedmetadata", markReady);
   v.addEventListener("loadeddata", markReady);
@@ -1590,6 +1603,17 @@ exportBtn.addEventListener("click", async () => {
     return;
   }
 
+  // Firefox's WebCodecs VideoEncoder exists and *looks* usable, but
+  // doesn't populate the same encoded-chunk metadata Chrome/Edge do
+  // (confirmed: mp4-muxer crashes reading a colorSpace field Firefox
+  // never fills in) - a real gap in Firefox's implementation, not
+  // something fixable here. Caught upfront with a clear message rather
+  // than letting it fail deep inside the encode loop with a raw error.
+  if (/Firefox/i.test(navigator.userAgent)) {
+    setStatus("Export isn't fully supported in Firefox yet (missing video metadata that Chrome/Edge provide) — please use Chrome or Edge to export.");
+    return;
+  }
+
   exportBtn.disabled = true;
   playBtn.disabled = true;
   progressWrap.classList.add("active");
@@ -1787,7 +1811,17 @@ exportBtn.addEventListener("click", async () => {
     setStatus("Done — file downloaded.");
   } catch (err) {
     console.error(err);
-    setStatus("Export failed: " + err.message);
+    // Same failure signature as the Firefox check above (a browser's
+    // WebCodecs encoder not filling in decoderConfig/colorSpace that
+    // mp4-muxer expects) - the Firefox check catches this ahead of time,
+    // but this is a backstop in case some other browser (Safari's
+    // WebCodecs support is also less mature than Chrome's) hits the same
+    // gap, so it still gets a clear message instead of a raw JS error.
+    if (/decoderConfig|colorSpace/i.test(err.message || "")) {
+      setStatus("Export failed: this browser's video encoder is missing metadata this tool needs — please use Chrome or Edge to export.");
+    } else {
+      setStatus("Export failed: " + err.message);
+    }
   } finally {
     exportBtn.disabled = false;
     playBtn.disabled = false;
