@@ -635,6 +635,14 @@
           <option value="2">2x</option>
         </select>
       </div>
+      <label class="fade-toggle-row">
+        <input type="checkbox" id="topKeepAudio">
+        <span>Keep original audio</span>
+      </label>
+      <div class="zoom-row" id="topAudioLevelRow" hidden>
+        <label class="zoom-label" for="topAudioLevel">Level <span id="topAudioLevelValue">100%</span></label>
+        <input type="range" id="topAudioLevel" min="0" max="1" step="0.01" value="1">
+      </div>
     </div>
 
     <div class="slot">
@@ -674,6 +682,14 @@
           <option value="1.5">1.5x</option>
           <option value="2">2x</option>
         </select>
+      </div>
+      <label class="fade-toggle-row">
+        <input type="checkbox" id="bottomKeepAudio">
+        <span>Keep original audio</span>
+      </label>
+      <div class="zoom-row" id="bottomAudioLevelRow" hidden>
+        <label class="zoom-label" for="bottomAudioLevel">Level <span id="bottomAudioLevelValue">100%</span></label>
+        <input type="range" id="bottomAudioLevel" min="0" max="1" step="0.01" value="1">
       </div>
     </div>
   </div>
@@ -762,6 +778,10 @@
       <input type="checkbox" id="fadeToggle" checked>
       <span>Fade in/out (0.5s)</span>
     </label>
+    <div class="zoom-row">
+      <label class="zoom-label" for="musicLevel">Music level <span id="musicLevelValue">100%</span></label>
+      <input type="range" id="musicLevel" min="0" max="1" step="0.01" value="1">
+    </div>
     <div class="audio-status" id="audioStatus"></div>
   </div>
   </div>
@@ -785,8 +805,8 @@ const FILTERS = {
 };
 
 const state = {
-  top: { video: null, url: null, filter: "clean", ready: false, zoom: 1.15, panY: 0, duration: 0, trimStart: 0, trimEnd: 0, speed: 1 },
-  bottom: { video: null, url: null, filter: "clean", ready: false, zoom: 1, panY: 0, duration: 0, trimStart: 0, trimEnd: 0, speed: 1 }
+  top: { video: null, url: null, file: null, filter: "clean", ready: false, zoom: 1.15, panY: 0, duration: 0, trimStart: 0, trimEnd: 0, speed: 1, keepAudio: false, audioLevel: 1, decodedAudio: null },
+  bottom: { video: null, url: null, file: null, filter: "clean", ready: false, zoom: 1, panY: 0, duration: 0, trimStart: 0, trimEnd: 0, speed: 1, keepAudio: false, audioLevel: 1, decodedAudio: null }
 };
 
 const MIN_TRIM_LENGTH = 0.5;
@@ -848,6 +868,7 @@ const audioState = {
   tracks: [null, null, null],   // { file, decoded (AudioBuffer), name } per slot
   selectedIndex: null,
   fade: true,
+  musicLevel: 1,
   startOffset: null,
   renderedBuffer: null
 };
@@ -943,7 +964,20 @@ function loadFile(slotName, file) {
   const v = makeVideoEl();
   slot.video = v;
   slot.url = url;
+  slot.file = file;
   slot.ready = false;
+  v.volume = slot.audioLevel;
+
+  // A replaced file's audio may have nothing to do with the old one, so
+  // "keep original audio" resets to off (and gets re-decoded fresh if the
+  // user re-checks it) rather than silently carrying over - unlike speed,
+  // which is a stylistic preference safe to keep across files.
+  slot.keepAudio = false;
+  slot.decodedAudio = null;
+  const keepAudioBox = document.getElementById(slotName + "KeepAudio");
+  const audioLevelRow = document.getElementById(slotName + "AudioLevelRow");
+  if (keepAudioBox) keepAudioBox.checked = false;
+  if (audioLevelRow) audioLevelRow.hidden = true;
 
   let settled = false;
   const markReady = () => {
@@ -1159,7 +1193,7 @@ function getAudioCtx() {
 // `duration` seconds long (silence-padded by the source node if the track
 // is too short to fill it), so it drops straight into both the preview
 // player and the export encoder with no further trimming.
-async function renderAudioSegment(buffer, startOffset, duration, fade) {
+async function renderAudioSegment(buffer, startOffset, duration, fade, level) {
   const sampleRate = buffer.sampleRate;
   const channels = buffer.numberOfChannels;
   const offlineCtx = new OfflineAudioContext(channels, Math.ceil(duration * sampleRate), sampleRate);
@@ -1171,11 +1205,11 @@ async function renderAudioSegment(buffer, startOffset, duration, fade) {
   if (fade) {
     const fadeLen = Math.min(0.5, duration / 2);
     gain.gain.setValueAtTime(0, 0);
-    gain.gain.linearRampToValueAtTime(1, fadeLen);
-    gain.gain.setValueAtTime(1, Math.max(fadeLen, duration - fadeLen));
+    gain.gain.linearRampToValueAtTime(level, fadeLen);
+    gain.gain.setValueAtTime(level, Math.max(fadeLen, duration - fadeLen));
     gain.gain.linearRampToValueAtTime(0, duration);
   } else {
-    gain.gain.setValueAtTime(1, 0);
+    gain.gain.setValueAtTime(level, 0);
   }
   src.start(0, startOffset, duration);
   return offlineCtx.startRendering();
@@ -1219,7 +1253,7 @@ async function refreshAudioSegment(opts = {}) {
 
   const myToken = ++audioRenderToken;
   setAudioStatus("Rendering audio segment...");
-  const rendered = await renderAudioSegment(track.decoded, audioState.startOffset, outputDuration, audioState.fade);
+  const rendered = await renderAudioSegment(track.decoded, audioState.startOffset, outputDuration, audioState.fade, audioState.musicLevel);
   if (myToken !== audioRenderToken) return; // superseded by a newer selection/track/fade/output change
   audioState.renderedBuffer = rendered;
 
@@ -1301,6 +1335,13 @@ DEFAULT_TRACKS.forEach((t, idx) => loadDefaultTrack(idx, t.url, t.name));
 
 document.getElementById("fadeToggle").addEventListener("change", e => {
   audioState.fade = e.target.checked;
+  refreshAudioSegment({ forceNewStart: false });
+});
+
+const musicLevelValue = document.getElementById("musicLevelValue");
+document.getElementById("musicLevel").addEventListener("input", e => {
+  audioState.musicLevel = parseFloat(e.target.value);
+  musicLevelValue.textContent = Math.round(audioState.musicLevel * 100) + "%";
   refreshAudioSegment({ forceNewStart: false });
 });
 
@@ -1510,10 +1551,10 @@ document.getElementById("bottomTrimEnd").addEventListener("input", () => handleT
 // --- Per-clip speed ---
 // Only affects real-time preview playback directly (via playbackRate) -
 // export is seek-driven, not real-time, so speed there is folded into
-// sourceTimeFor's math instead (see the export handler). Audio pitch is
-// left at whatever the browser defaults to (untouched), and moot anyway
-// since these <video> elements are always muted - only the separate
-// background-music pipeline actually produces sound.
+// sourceTimeFor's math instead (see the export handler). Audio pitch
+// follows along automatically via the <video> element's own playbackRate
+// when "keep original audio" is on (see below); otherwise it's moot since
+// the element stays muted.
 function handleSpeedChange(slotName) {
   const slot = state[slotName];
   const select = document.getElementById(slotName + "Speed");
@@ -1523,6 +1564,67 @@ function handleSpeedChange(slotName) {
 }
 document.getElementById("topSpeed").addEventListener("change", () => handleSpeedChange("top"));
 document.getElementById("bottomSpeed").addEventListener("change", () => handleSpeedChange("bottom"));
+
+// --- Per-clip original audio ---
+// Live preview needs no offline rendering at all: the <video> elements
+// already play in real time (see previewLoop), so simply unmuting one and
+// setting its volume is enough to hear it in sync, at the right speed and
+// looping within its own trim range, for free. Export is seek-driven
+// (not real-time) so it can't capture that live playback - instead the
+// exact same trim/speed/loop behavior is reproduced offline via
+// AudioBufferSourceNode's loopStart/loopEnd/playbackRate, which is a
+// precise match for sourceTimeFor's math (see buildFinalAudioBuffer).
+async function decodeSlotAudio(slotName) {
+  const slot = state[slotName];
+  if (slot.decodedAudio || !slot.file) return slot.decodedAudio;
+  setStatus(`Extracting audio from the ${slotName} clip...`);
+  try {
+    const arrayBuffer = await slot.file.arrayBuffer();
+    slot.decodedAudio = await getAudioCtx().decodeAudioData(arrayBuffer);
+    setStatus("");
+  } catch (err) {
+    console.error(err);
+    slot.decodedAudio = null;
+  }
+  return slot.decodedAudio;
+}
+
+function setupKeepAudioControls(slotName) {
+  const slot = state[slotName];
+  const checkbox = document.getElementById(slotName + "KeepAudio");
+  const levelRow = document.getElementById(slotName + "AudioLevelRow");
+  const levelInput = document.getElementById(slotName + "AudioLevel");
+  const levelValue = document.getElementById(slotName + "AudioLevelValue");
+
+  checkbox.addEventListener("change", async e => {
+    const checked = e.target.checked;
+    levelRow.hidden = !checked;
+    if (!checked) {
+      slot.keepAudio = false;
+      if (slot.video) slot.video.muted = true;
+      return;
+    }
+    checkbox.disabled = true;
+    const decoded = await decodeSlotAudio(slotName);
+    checkbox.disabled = false;
+    if (!decoded) {
+      checkbox.checked = false;
+      levelRow.hidden = true;
+      setStatus(`Couldn't extract audio from the ${slotName} clip — it may have no audio track.`);
+      return;
+    }
+    slot.keepAudio = true;
+    if (slot.video) slot.video.muted = false;
+  });
+
+  levelInput.addEventListener("input", e => {
+    slot.audioLevel = parseFloat(e.target.value);
+    levelValue.textContent = Math.round(slot.audioLevel * 100) + "%";
+    if (slot.video) slot.video.volume = slot.audioLevel;
+  });
+}
+setupKeepAudioControls("top");
+setupKeepAudioControls("bottom");
 
 // --- Output length ---
 document.getElementById("outputCustomRow").hidden = outputState.mode !== "custom";
@@ -1623,6 +1725,57 @@ playBtn.addEventListener("click", () => {
   }
 });
 
+// Mixes together whichever audio sources are active - the background
+// music track (already fade+level-rendered into audioState.renderedBuffer)
+// and each clip's own original audio, if "keep original audio" is on for
+// it - into a single `duration`-second buffer for the export encoder.
+// Each clip's original audio is looped/speed-adjusted via
+// AudioBufferSourceNode's loopStart/loopEnd/playbackRate, which reproduces
+// sourceTimeFor's trim+speed+loop math exactly (same formula, just running
+// on the audio timeline instead of being sampled once per video frame).
+// Returns null if nothing is active, so export falls back to video-only,
+// same as before any of this existed.
+async function buildFinalAudioBuffer(duration) {
+  const sources = [];
+  if (audioState.renderedBuffer) {
+    sources.push({ buffer: audioState.renderedBuffer, offset: 0 });
+  }
+  for (const slot of [state.top, state.bottom]) {
+    if (!slot.keepAudio || !slot.decodedAudio) continue;
+    const trimmedLength = slot.trimEnd - slot.trimStart;
+    sources.push({
+      buffer: slot.decodedAudio,
+      offset: slot.trimStart,
+      loop: trimmedLength > 0,
+      loopStart: slot.trimStart,
+      loopEnd: slot.trimEnd,
+      playbackRate: slot.speed,
+      gain: slot.audioLevel
+    });
+  }
+  if (sources.length === 0) return null;
+
+  const sampleRate = 48000;
+  const channels = 2;
+  const offlineCtx = new OfflineAudioContext(channels, Math.ceil(duration * sampleRate), sampleRate);
+  for (const s of sources) {
+    const src = offlineCtx.createBufferSource();
+    src.buffer = s.buffer;
+    if (s.loop) {
+      src.loop = true;
+      src.loopStart = s.loopStart;
+      src.loopEnd = s.loopEnd;
+    }
+    if (s.playbackRate) src.playbackRate.value = s.playbackRate;
+    const gain = offlineCtx.createGain();
+    gain.gain.value = s.gain != null ? s.gain : 1;
+    src.connect(gain);
+    gain.connect(offlineCtx.destination);
+    src.start(0, s.offset);
+  }
+  return offlineCtx.startRendering();
+}
+
 // --- Export (frame-accurate, seek-driven, via WebCodecs + mp4-muxer) ---
 exportBtn.addEventListener("click", async () => {
   if (!state.top.ready || !state.bottom.ready) return;
@@ -1695,16 +1848,18 @@ exportBtn.addEventListener("click", async () => {
     return slot.trimStart + (sourceElapsed % trimmedLength);
   }
 
-  // Audio is only baked in if a track is selected and its segment has
-  // finished rendering (see refreshAudioSegment) - otherwise this exports
-  // video-only, same as before background music existed. Encoded fully
+  // Audio is only baked in if at least one source is active (background
+  // music and/or a clip's kept original audio) - otherwise this exports
+  // video-only, same as before any audio feature existed. Encoded fully
   // *before* the Muxer is created (and only added to its config on
   // success) so a mid-encode failure can't leave the Muxer declaring an
   // audio track it never actually receives samples for - AudioEncoder
   // failures are rare (Chrome that supports the VideoEncoder codec used
   // above supports AAC too) but a malformed output file isn't an
   // acceptable way to find that out.
-  const audioBuffer = audioState.renderedBuffer;
+  if (state.top.keepAudio && !state.top.decodedAudio) await decodeSlotAudio("top");
+  if (state.bottom.keepAudio && !state.bottom.decodedAudio) await decodeSlotAudio("bottom");
+  const audioBuffer = await buildFinalAudioBuffer(outputDuration);
   let hasAudio = false;
   let audioChunks = [];
   if (audioBuffer && typeof AudioEncoder !== "undefined") {
