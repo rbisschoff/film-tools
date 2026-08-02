@@ -38,11 +38,51 @@
   }
   canvas {
     width: min(320px, 80vw);
+    /* aspect-ratio is set from JS (applyAspectRatio) to match whichever
+       preset is selected - canvas.width/height are the source of truth,
+       this just keeps the on-screen box from looking stretched/squashed
+       relative to them before the first frame draws. */
     aspect-ratio: 9/16;
     background: #000;
     border-radius: 4px;
     border: 1px solid var(--line);
     display: block;
+  }
+  .aspect-panel {
+    width: 100%;
+    max-width: 960px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px;
+  }
+  .aspect-panel h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 10px;
+    font-weight: 600;
+  }
+  .aspect-mode-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .aspect-mode-row label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .aspect-mode-row input[type="radio"] {
+    accent-color: var(--accent);
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    margin: 0;
   }
   .controls {
     width: 100%;
@@ -73,6 +113,12 @@
     border: 1px solid var(--line);
     border-radius: 6px;
     padding: 10px;
+    /* Grid items default to min-width: auto, which means a track can't
+       shrink below its content's intrinsic minimum width - normally
+       invisible, but the new speed <select> pushed that minimum past
+       what a 1fr column has room for at narrow widths, blowing the grid
+       out to double-width instead of the intended 2-column layout. */
+    min-width: 0;
   }
   .slot h2 {
     font-size: 11px;
@@ -195,6 +241,19 @@
   .trim-sep {
     color: var(--muted);
     font-size: 11px;
+  }
+  .speed-row {
+    margin-top: 8px;
+  }
+  .speed-row select {
+    width: 100%;
+    padding: 6px;
+    background: #1e2126;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 11px;
+    cursor: pointer;
   }
   .transport {
     display: flex;
@@ -381,6 +440,109 @@
     font-size: 12px;
     font-variant-numeric: tabular-nums;
   }
+  .text-panel {
+    width: 100%;
+    max-width: 960px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px;
+  }
+  .text-panel h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 10px;
+    font-weight: 600;
+  }
+  .text-panel textarea {
+    width: 100%;
+    resize: vertical;
+    min-height: 44px;
+    padding: 8px 10px;
+    background: #1e2126;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+  }
+  .text-panel textarea::placeholder {
+    color: var(--muted);
+  }
+  .text-controls-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  @media (max-width: 620px) {
+    .text-controls-grid { grid-template-columns: 1fr; }
+  }
+  .text-field label {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .text-field select {
+    width: 100%;
+    padding: 6px;
+    background: #1e2126;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .text-field input[type="color"] {
+    width: 100%;
+    height: 30px;
+    padding: 2px;
+    background: #1e2126;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .text-position-row {
+    display: flex;
+    gap: 12px;
+  }
+  .text-position-row label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .text-position-row input[type="radio"] {
+    accent-color: var(--accent);
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    margin: 0;
+  }
+  .text-bg-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .text-bg-toggle-row input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+    margin: 0;
+  }
 </style>
 </head>
 <body>
@@ -394,6 +556,15 @@
     </div>
     <div class="progress-wrap" id="progressWrap"><div class="progress-bar" id="progressBar"></div></div>
     <div class="status" id="status"></div>
+  </div>
+
+  <div class="aspect-panel">
+    <h2>Aspect ratio</h2>
+    <div class="aspect-mode-row">
+      <label><input type="radio" name="aspectRatio" value="9:16" checked> 9:16 (Reels/Stories)</label>
+      <label><input type="radio" name="aspectRatio" value="1:1"> 1:1 (Square)</label>
+      <label><input type="radio" name="aspectRatio" value="4:5"> 4:5 (Feed)</label>
+    </div>
   </div>
 
   <div class="controls">
@@ -424,6 +595,17 @@
           <input type="number" id="topTrimEnd" min="0" step="0.1" value="0">
         </div>
       </div>
+      <div class="speed-row">
+        <label class="zoom-label" for="topSpeed">Speed</label>
+        <select id="topSpeed">
+          <option value="0.25">0.25x</option>
+          <option value="0.5">0.5x</option>
+          <option value="0.75">0.75x</option>
+          <option value="1" selected>1x</option>
+          <option value="1.5">1.5x</option>
+          <option value="2">2x</option>
+        </select>
+      </div>
     </div>
 
     <div class="slot">
@@ -453,6 +635,17 @@
           <input type="number" id="bottomTrimEnd" min="0" step="0.1" value="0">
         </div>
       </div>
+      <div class="speed-row">
+        <label class="zoom-label" for="bottomSpeed">Speed</label>
+        <select id="bottomSpeed">
+          <option value="0.25">0.25x</option>
+          <option value="0.5">0.5x</option>
+          <option value="0.75">0.75x</option>
+          <option value="1" selected>1x</option>
+          <option value="1.5">1.5x</option>
+          <option value="2">2x</option>
+        </select>
+      </div>
     </div>
   </div>
 
@@ -467,6 +660,42 @@
       <input type="number" id="outputCustomSeconds" min="1" max="60" step="0.5" value="6">
       <span>seconds</span>
     </div>
+  </div>
+
+  <div class="text-panel">
+    <h2>Text overlay</h2>
+    <textarea id="overlayText" rows="2" placeholder="Add a caption — leave empty to skip it"></textarea>
+    <div class="text-controls-grid">
+      <div class="text-field">
+        <label for="overlayPosition">Position</label>
+        <div class="text-position-row">
+          <label><input type="radio" name="overlayPosition" value="top"> Top</label>
+          <label><input type="radio" name="overlayPosition" value="middle"> Middle</label>
+          <label><input type="radio" name="overlayPosition" value="bottom" checked> Bottom</label>
+        </div>
+      </div>
+      <div class="text-field">
+        <label for="overlayFont">Font</label>
+        <select id="overlayFont">
+          <option value="system">System sans</option>
+          <option value="serif">Serif</option>
+          <option value="mono">Mono</option>
+          <option value="impact">Impact (caption style)</option>
+        </select>
+      </div>
+      <div class="text-field">
+        <label for="overlaySize">Size <span id="overlaySizeValue">54px</span></label>
+        <input type="range" id="overlaySize" min="24" max="120" step="1" value="54">
+      </div>
+      <div class="text-field">
+        <label for="overlayColor">Color</label>
+        <input type="color" id="overlayColor" value="#ffffff">
+      </div>
+    </div>
+    <label class="text-bg-toggle-row">
+      <input type="checkbox" id="overlayBg" checked>
+      <span>Semi-transparent background bar</span>
+    </label>
   </div>
 
   <div class="audio-panel">
@@ -526,26 +755,58 @@ const FILTERS = {
 };
 
 const state = {
-  top: { video: null, url: null, filter: "clean", ready: false, zoom: 1.15, panY: 0, duration: 0, trimStart: 0, trimEnd: 0 },
-  bottom: { video: null, url: null, filter: "clean", ready: false, zoom: 1, panY: 0, duration: 0, trimStart: 0, trimEnd: 0 }
+  top: { video: null, url: null, filter: "clean", ready: false, zoom: 1.15, panY: 0, duration: 0, trimStart: 0, trimEnd: 0, speed: 1 },
+  bottom: { video: null, url: null, filter: "clean", ready: false, zoom: 1, panY: 0, duration: 0, trimStart: 0, trimEnd: 0, speed: 1 }
 };
 
 const MIN_TRIM_LENGTH = 0.5;
 
+// How long a clip's trimmed segment actually plays for at its chosen
+// speed - a 4s trim at 2x plays in 2s, at 0.5x it plays in 8s. This is
+// what output-length math and looping should measure against, not the
+// raw (end - start) trim length.
+function effectiveTrimLength(slot) {
+  return (slot.trimEnd - slot.trimStart) / slot.speed;
+}
+
 // Output length: "shorter"/"longer" derive it from each clip's own
-// trimmed length (end - start); "custom" uses a fixed seconds value
-// instead. Whichever clip's trimmed segment is shorter than this loops
-// to fill it, and whichever is longer gets truncated - see sourceTimeFor
-// in the export handler below for exactly how.
+// *effective* trimmed length (trim length adjusted for speed); "custom"
+// uses a fixed seconds value instead. Whichever clip's effective length
+// is shorter than this loops to fill it, and whichever is longer gets
+// truncated - see sourceTimeFor in the export handler below for exactly
+// how.
 const outputState = { mode: "shorter", customSeconds: 6 };
 
 function getOutputDuration() {
-  const topLen = state.top.trimEnd - state.top.trimStart;
-  const bottomLen = state.bottom.trimEnd - state.bottom.trimStart;
+  const topLen = effectiveTrimLength(state.top);
+  const bottomLen = effectiveTrimLength(state.bottom);
   if (outputState.mode === "longer") return Math.max(topLen, bottomLen);
   if (outputState.mode === "custom") return Math.max(1, Math.min(60, outputState.customSeconds));
   return Math.min(topLen, bottomLen);
 }
+
+// Text overlay: drawn onto the canvas at the end of drawFrame(), after
+// both clips, so it's baked into every frame the same way for preview
+// and export - no separate export-only code path needed. Font choices
+// are limited to system-installed stacks on purpose: canvas text drawn
+// before a web font finishes loading silently falls back with no error,
+// so sticking to fonts that are always already available sidesteps that
+// whole class of bug rather than needing FontFace/document.fonts.ready
+// handling.
+const FONT_STACKS = {
+  system: `-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`,
+  serif: `Georgia, "Times New Roman", serif`,
+  mono: `"Courier New", monospace`,
+  impact: `Impact, "Arial Narrow Bold", sans-serif`
+};
+const textOverlay = {
+  text: "",
+  position: "bottom", // "top" | "middle" | "bottom"
+  font: "system",
+  size: 54,
+  color: "#ffffff",
+  background: true
+};
 
 // Background music: 3 loadable tracks, one selected at a time. selectedIndex
 // picks WHICH track; the tool then picks a random start point within it
@@ -563,19 +824,53 @@ const audioState = {
 
 const canvas = document.getElementById("stage");
 const ctx = canvas.getContext("2d");
-const W = canvas.width, H = canvas.height;
-// A solid black divider between the two clips - 2% of canvas height reads
-// clearly as a deliberate gap without eating much frame. It needs no
-// dedicated draw call: drawFrame() fills the whole canvas black first, so
-// leaving this gap between the two drawHalf() calls is enough.
-const BAR_H = Math.round(H * 0.02);
-const VIDEO_H = H - BAR_H;
-// Top gets 1/3 of the remaining video area, bottom the other 2/3 -
-// BOTTOM_H is derived as VIDEO_H - TOP_H (not VIDEO_H * 2/3) so the two
-// sections always add up to exactly VIDEO_H with no rounding gap.
-const TOP_H = VIDEO_H / 3;
-const BOTTOM_H = VIDEO_H - TOP_H;
-const BOTTOM_Y = TOP_H + BAR_H;
+
+// Canvas geometry is derived state, not fixed constants - aspect ratio
+// presets change canvas.width/height at runtime (see applyAspectRatio),
+// and everything below is recomputed from whatever those currently are.
+let W, H, BAR_H, VIDEO_H, TOP_H, BOTTOM_H, BOTTOM_Y;
+
+const ASPECT_RATIOS = {
+  "9:16": { width: 1080, height: 1920 },
+  "1:1": { width: 1080, height: 1080 },
+  "4:5": { width: 1080, height: 1350 }
+};
+
+function applyAspectRatio(key) {
+  const dims = ASPECT_RATIOS[key];
+  if (!dims) return;
+  canvas.width = dims.width;
+  canvas.height = dims.height;
+  canvas.style.aspectRatio = `${dims.width}/${dims.height}`;
+
+  W = canvas.width;
+  H = canvas.height;
+  // A solid black divider between the two clips - 2% of canvas height
+  // reads clearly as a deliberate gap without eating much frame. It
+  // needs no dedicated draw call: drawFrame() fills the whole canvas
+  // black first, so leaving this gap between the two drawHalf() calls
+  // is enough.
+  BAR_H = Math.round(H * 0.02);
+  VIDEO_H = H - BAR_H;
+  // Top gets 1/3 of the remaining video area, bottom the other 2/3 -
+  // BOTTOM_H is derived as VIDEO_H - TOP_H (not VIDEO_H * 2/3) so the
+  // two sections always add up to exactly VIDEO_H with no rounding gap.
+  TOP_H = VIDEO_H / 3;
+  BOTTOM_H = VIDEO_H - TOP_H;
+  BOTTOM_Y = TOP_H + BAR_H;
+
+  // drawHalf/drawFrame read W/H/TOP_H/etc fresh every call (nothing
+  // caches stale geometry), so redrawing here is all a ratio switch
+  // needs to re-run each clip's crop math against the new dimensions.
+  if (state.top.ready && state.bottom.ready) drawFrame();
+}
+applyAspectRatio("9:16");
+
+document.querySelectorAll('input[name="aspectRatio"]').forEach(radio => {
+  radio.addEventListener("change", () => {
+    if (radio.checked) applyAspectRatio(radio.value);
+  });
+});
 
 const playBtn = document.getElementById("playBtn");
 const exportBtn = document.getElementById("exportBtn");
@@ -632,10 +927,15 @@ function loadFile(slotName, file) {
   // Trim range resets fresh for every new file, including a re-upload
   // replacing the previous one - there's no case where a stale trim
   // range from a different clip should carry over onto a new duration.
+  // Speed is a per-slot preference, not tied to any one file, so it's
+  // re-applied to whatever video element is currently loaded rather than
+  // reset - playbackRate lives on the <video> element itself and defaults
+  // back to 1 on every fresh element otherwise.
   v.addEventListener("loadedmetadata", () => {
     slot.duration = v.duration;
     slot.trimStart = 0;
     slot.trimEnd = v.duration;
+    v.playbackRate = slot.speed;
     updateTrimInputs(slotName);
   });
   v.addEventListener("loadedmetadata", markReady);
@@ -741,11 +1041,54 @@ function drawHalf(video, filter, yOffset, sectionHeight, zoom = 1, panY = 0) {
   ctx.restore();
 }
 
+// Draws the caption text on top of both clips, wrapping on explicit
+// newlines only (not auto-wrapped to width) and centered horizontally.
+// Position is inset ~10% of the canvas height from the top/bottom edge
+// specifically so it clears where Instagram's own UI (captions, profile
+// row, action buttons) tends to sit over Reels/Stories content.
+function drawTextOverlay() {
+  if (!textOverlay.text.trim()) return;
+  const inset = H * 0.1;
+  const fontPx = textOverlay.size;
+  const lines = textOverlay.text.split("\n");
+  const lineHeight = fontPx * 1.25;
+  const blockHeight = lineHeight * lines.length;
+
+  ctx.save();
+  ctx.font = `700 ${fontPx}px ${FONT_STACKS[textOverlay.font] || FONT_STACKS.system}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  let centerY;
+  if (textOverlay.position === "top") centerY = inset + blockHeight / 2;
+  else if (textOverlay.position === "bottom") centerY = H - inset - blockHeight / 2;
+  else centerY = H / 2;
+
+  if (textOverlay.background) {
+    const padding = fontPx * 0.4;
+    const maxLineWidth = Math.max(...lines.map(line => ctx.measureText(line).width));
+    ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+    ctx.fillRect(
+      W / 2 - maxLineWidth / 2 - padding,
+      centerY - blockHeight / 2 - padding,
+      maxLineWidth + padding * 2,
+      blockHeight + padding * 2
+    );
+  }
+
+  ctx.fillStyle = textOverlay.color;
+  lines.forEach((line, i) => {
+    ctx.fillText(line, W / 2, centerY - blockHeight / 2 + lineHeight * (i + 0.5));
+  });
+  ctx.restore();
+}
+
 function drawFrame() {
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, W, H);
   drawHalf(state.top.video, state.top.filter, 0, TOP_H, state.top.zoom, state.top.panY);
   drawHalf(state.bottom.video, state.bottom.filter, BOTTOM_Y, BOTTOM_H, state.bottom.zoom, state.bottom.panY);
+  drawTextOverlay();
 }
 
 // --- Background music ---
@@ -1121,6 +1464,23 @@ document.getElementById("topTrimEnd").addEventListener("input", () => handleTrim
 document.getElementById("bottomTrimStart").addEventListener("input", () => handleTrimChange("bottom", "start"));
 document.getElementById("bottomTrimEnd").addEventListener("input", () => handleTrimChange("bottom", "end"));
 
+// --- Per-clip speed ---
+// Only affects real-time preview playback directly (via playbackRate) -
+// export is seek-driven, not real-time, so speed there is folded into
+// sourceTimeFor's math instead (see the export handler). Audio pitch is
+// left at whatever the browser defaults to (untouched), and moot anyway
+// since these <video> elements are always muted - only the separate
+// background-music pipeline actually produces sound.
+function handleSpeedChange(slotName) {
+  const slot = state[slotName];
+  const select = document.getElementById(slotName + "Speed");
+  slot.speed = parseFloat(select.value) || 1;
+  if (slot.video) slot.video.playbackRate = slot.speed;
+  if (state.top.ready && state.bottom.ready) refreshAudioSegment({ forceNewStart: false });
+}
+document.getElementById("topSpeed").addEventListener("change", () => handleSpeedChange("top"));
+document.getElementById("bottomSpeed").addEventListener("change", () => handleSpeedChange("bottom"));
+
 // --- Output length ---
 document.getElementById("outputCustomRow").hidden = outputState.mode !== "custom";
 document.querySelectorAll('input[name="outputMode"]').forEach(radio => {
@@ -1137,6 +1497,43 @@ outputCustomInput.addEventListener("input", () => {
   const v = parseFloat(outputCustomInput.value);
   if (!Number.isNaN(v)) outputState.customSeconds = Math.max(1, Math.min(60, v));
   if (state.top.ready && state.bottom.ready) refreshAudioSegment({ forceNewStart: false });
+});
+
+// --- Text overlay ---
+function redrawIfReady() {
+  if (state.top.ready && state.bottom.ready) drawFrame();
+}
+
+document.getElementById("overlayText").addEventListener("input", e => {
+  textOverlay.text = e.target.value;
+  redrawIfReady();
+});
+document.querySelectorAll('input[name="overlayPosition"]').forEach(radio => {
+  radio.addEventListener("change", () => {
+    if (radio.checked) {
+      textOverlay.position = radio.value;
+      redrawIfReady();
+    }
+  });
+});
+document.getElementById("overlayFont").addEventListener("change", e => {
+  textOverlay.font = e.target.value;
+  redrawIfReady();
+});
+const overlaySizeInput = document.getElementById("overlaySize");
+const overlaySizeValue = document.getElementById("overlaySizeValue");
+overlaySizeInput.addEventListener("input", () => {
+  textOverlay.size = parseInt(overlaySizeInput.value, 10);
+  overlaySizeValue.textContent = textOverlay.size + "px";
+  redrawIfReady();
+});
+document.getElementById("overlayColor").addEventListener("input", e => {
+  textOverlay.color = e.target.value;
+  redrawIfReady();
+});
+document.getElementById("overlayBg").addEventListener("change", e => {
+  textOverlay.background = e.target.checked;
+  redrawIfReady();
 });
 
 // --- Preview playback ---
@@ -1227,16 +1624,21 @@ exportBtn.addEventListener("click", async () => {
   const frameCount = Math.max(1, Math.floor(outputDuration * fps));
 
   // Maps an overall output-timeline position `t` (0..outputDuration) to a
-  // source-video time within [trimStart, trimEnd): if the trimmed clip is
-  // shorter than the output, `t % trimmedLength` wraps back around -
-  // looping it to fill the remaining time. If it's longer, `t` never
-  // reaches trimmedLength so this never wraps - it just plays straight
-  // through and gets truncated at outputDuration. One formula covers
-  // both the "loop to fill" and "truncate" cases.
+  // source-video time within [trimStart, trimEnd). `t * speed` converts
+  // output-timeline seconds to source-timeline seconds first (2x speed
+  // means 1s of output covers 2s of source - fast-forward; 0.5x means it
+  // covers only 0.5s - slow motion), *then* wraps that within
+  // trimmedLength: if the (speed-adjusted) trimmed clip is shorter than
+  // the output, it wraps back around to loop and fill the remaining
+  // time; if longer, elapsed source time never reaches trimmedLength so
+  // this never wraps - it just plays straight through and gets
+  // truncated at outputDuration. One formula covers both cases, same as
+  // before speed existed (speed=1 reduces to the original math exactly).
   function sourceTimeFor(slot, t) {
     const trimmedLength = slot.trimEnd - slot.trimStart;
     if (trimmedLength <= 0) return slot.trimStart;
-    return slot.trimStart + (t % trimmedLength);
+    const sourceElapsed = t * slot.speed;
+    return slot.trimStart + (sourceElapsed % trimmedLength);
   }
 
   // Audio is only baked in if a track is selected and its segment has
