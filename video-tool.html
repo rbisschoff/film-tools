@@ -136,7 +136,57 @@
     .output-mode-row { gap: 8px; }
     .output-mode-row label { font-size: 11px; }
   }
-  .slot {
+  .three-stack-controls {
+      width: 100%;
+      max-width: 960px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 14px;
+    }
+    .three-stack-controls[hidden] { display: none; }
+    .three-stack-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .three-stack-header h2 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin: 0;
+      font-weight: 600;
+    }
+    .three-stack-header span { font-size: 10px; color: var(--muted); }
+    .stack-slots {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .stack-slot {
+      background: #1a1c20;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 9px;
+      min-width: 0;
+    }
+    .stack-slot h3 {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      margin: 0 0 7px;
+      font-weight: 600;
+    }
+    @media (max-width: 620px) {
+      .three-stack-header { flex-direction: column; gap: 3px; }
+      .stack-slots { grid-template-columns: 1fr; }
+    }
+  
+    .slot {
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: 6px;
@@ -593,6 +643,7 @@
       <label><input type="radio" name="aspectRatio" value="9:16" checked> 9:16 (Reels/Stories)</label>
       <label><input type="radio" name="aspectRatio" value="1:1"> 1:1 (Square)</label>
       <label><input type="radio" name="aspectRatio" value="4:5"> 4:5 (Feed)</label>
+      <label><input type="radio" name="aspectRatio" value="3-stack"> 3 × Horizontal (3840×2160)</label>
     </div>
   </div>
 
@@ -690,6 +741,69 @@
       <div class="zoom-row" id="bottomAudioLevelRow" hidden>
         <label class="zoom-label" for="bottomAudioLevel">Level <span id="bottomAudioLevelValue">100%</span></label>
         <input type="range" id="bottomAudioLevel" min="0" max="1" step="0.01" value="1">
+      </div>
+    </div>
+  </div>
+
+  <div class="three-stack-controls" id="threeStackControls" hidden>
+    <div class="three-stack-header">
+      <h2>3 × Horizontal stack</h2>
+      <span>3840 × 2160 · three equal 720px panels</span>
+    </div>
+    <div class="stack-slots">
+      <div class="stack-slot">
+        <h3>Video 1</h3>
+        <label class="file-btn" for="stackFile1">Choose video</label>
+        <input type="file" id="stackFile1" accept="video/*" class="file-input-hidden">
+        <div class="filename" id="stackName1">No file selected</div>
+        <div class="zoom-row">
+          <label class="zoom-label" for="stackZoom1">Zoom <span id="stackZoomValue1">1.00x</span></label>
+          <input type="range" id="stackZoom1" min="1" max="3" step="0.01" value="1">
+        </div>
+        <div class="zoom-row">
+          <label class="zoom-label" for="stackPanX1">Centre point X <span id="stackPanXValue1">Center</span></label>
+          <input type="range" id="stackPanX1" min="-1" max="1" step="0.01" value="0">
+        </div>
+        <div class="zoom-row">
+          <label class="zoom-label" for="stackPanY1">Centre point Y <span id="stackPanYValue1">Center</span></label>
+          <input type="range" id="stackPanY1" min="-1" max="1" step="0.01" value="0">
+        </div>
+      </div>
+      <div class="stack-slot">
+        <h3>Video 2</h3>
+        <label class="file-btn" for="stackFile2">Choose video</label>
+        <input type="file" id="stackFile2" accept="video/*" class="file-input-hidden">
+        <div class="filename" id="stackName2">No file selected</div>
+        <div class="zoom-row">
+          <label class="zoom-label" for="stackZoom2">Zoom <span id="stackZoomValue2">1.00x</span></label>
+          <input type="range" id="stackZoom2" min="1" max="3" step="0.01" value="1">
+        </div>
+        <div class="zoom-row">
+          <label class="zoom-label" for="stackPanX2">Centre point X <span id="stackPanXValue2">Center</span></label>
+          <input type="range" id="stackPanX2" min="-1" max="1" step="0.01" value="0">
+        </div>
+        <div class="zoom-row">
+          <label class="zoom-label" for="stackPanY2">Centre point Y <span id="stackPanYValue2">Center</span></label>
+          <input type="range" id="stackPanY2" min="-1" max="1" step="0.01" value="0">
+        </div>
+      </div>
+      <div class="stack-slot">
+        <h3>Video 3</h3>
+        <label class="file-btn" for="stackFile3">Choose video</label>
+        <input type="file" id="stackFile3" accept="video/*" class="file-input-hidden">
+        <div class="filename" id="stackName3">No file selected</div>
+        <div class="zoom-row">
+          <label class="zoom-label" for="stackZoom3">Zoom <span id="stackZoomValue3">1.00x</span></label>
+          <input type="range" id="stackZoom3" min="1" max="3" step="0.01" value="1">
+        </div>
+        <div class="zoom-row">
+          <label class="zoom-label" for="stackPanX3">Centre point X <span id="stackPanXValue3">Center</span></label>
+          <input type="range" id="stackPanX3" min="-1" max="1" step="0.01" value="0">
+        </div>
+        <div class="zoom-row">
+          <label class="zoom-label" for="stackPanY3">Centre point Y <span id="stackPanYValue3">Center</span></label>
+          <input type="range" id="stackPanY3" min="-1" max="1" step="0.01" value="0">
+        </div>
       </div>
     </div>
   </div>
@@ -805,11 +919,19 @@ const FILTERS = {
 };
 
 const state = {
-  top: { video: null, url: null, file: null, filter: "clean", ready: false, zoom: 1.15, panY: 0, duration: 0, trimStart: 0, trimEnd: 0, speed: 1, keepAudio: false, audioLevel: 1, decodedAudio: null },
-  bottom: { video: null, url: null, file: null, filter: "clean", ready: false, zoom: 1, panY: 0, duration: 0, trimStart: 0, trimEnd: 0, speed: 1, keepAudio: false, audioLevel: 1, decodedAudio: null }
+  top: { video: null, url: null, file: null, filter: "clean", ready: false, zoom: 1.15, panX: 0, panY: 0, duration: 0, trimStart: 0, trimEnd: 0, speed: 1, keepAudio: false, audioLevel: 1, decodedAudio: null },
+  bottom: { video: null, url: null, file: null, filter: "clean", ready: false, zoom: 1, panX: 0, panY: 0, duration: 0, trimStart: 0, trimEnd: 0, speed: 1, keepAudio: false, audioLevel: 1, decodedAudio: null },
+  stack1: { video: null, url: null, file: null, filter: "clean", ready: false, zoom: 1, panX: 0, panY: 0, duration: 0, trimStart: 0, trimEnd: 0, speed: 1, keepAudio: false, audioLevel: 1, decodedAudio: null },
+  stack2: { video: null, url: null, file: null, filter: "clean", ready: false, zoom: 1, panX: 0, panY: 0, duration: 0, trimStart: 0, trimEnd: 0, speed: 1, keepAudio: false, audioLevel: 1, decodedAudio: null },
+  stack3: { video: null, url: null, file: null, filter: "clean", ready: false, zoom: 1, panX: 0, panY: 0, duration: 0, trimStart: 0, trimEnd: 0, speed: 1, keepAudio: false, audioLevel: 1, decodedAudio: null }
 };
 
 const MIN_TRIM_LENGTH = 0.5;
+let layoutMode = "standard";
+function isThreeStack() { return layoutMode === "3-stack"; }
+function getActiveSlotNames() { return isThreeStack() ? ["stack1", "stack2", "stack3"] : ["top", "bottom"]; }
+function getActiveSlots() { return getActiveSlotNames().map(name => state[name]); }
+function allActiveReady() { return getActiveSlots().every(slot => slot.ready); }
 
 // How long a clip's trimmed segment actually plays for at its chosen
 // speed - a 4s trim at 2x plays in 2s, at 0.5x it plays in 8s. This is
@@ -828,11 +950,11 @@ function effectiveTrimLength(slot) {
 const outputState = { mode: "shorter", customSeconds: 6 };
 
 function getOutputDuration() {
-  const topLen = effectiveTrimLength(state.top);
-  const bottomLen = effectiveTrimLength(state.bottom);
-  if (outputState.mode === "longer") return Math.max(topLen, bottomLen);
+  const lengths = getActiveSlots().map(effectiveTrimLength);
+  if (!lengths.length) return 0;
+  if (outputState.mode === "longer") return Math.max(...lengths);
   if (outputState.mode === "custom") return Math.max(1, Math.min(60, outputState.customSeconds));
-  return Math.min(topLen, bottomLen);
+  return Math.min(...lengths);
 }
 
 // Text overlay: drawn onto the canvas at the end of drawFrame(), after
@@ -879,7 +1001,7 @@ const ctx = canvas.getContext("2d");
 // Canvas geometry is derived state, not fixed constants - aspect ratio
 // presets change canvas.width/height at runtime (see applyAspectRatio),
 // and everything below is recomputed from whatever those currently are.
-let W, H, BAR_H, VIDEO_H, TOP_H, BOTTOM_H, BOTTOM_Y;
+let W, H, BAR_H, VIDEO_H, TOP_H, BOTTOM_H, BOTTOM_Y, STACK_H;
 
 const ASPECT_RATIOS = {
   "9:16": { width: 1080, height: 1920 },
@@ -887,33 +1009,44 @@ const ASPECT_RATIOS = {
   "4:5": { width: 1080, height: 1350 }
 };
 
+function updateLayoutVisibility() {
+  const three = document.getElementById("threeStackControls");
+  const standard = document.querySelector(".controls");
+  if (three) three.hidden = !isThreeStack();
+  if (standard) standard.hidden = isThreeStack();
+}
+
 function applyAspectRatio(key) {
+  if (key === "3-stack") {
+    layoutMode = "3-stack";
+    canvas.width = 3840;
+    canvas.height = 2160;
+    canvas.style.aspectRatio = "3840/2160";
+    W = 3840; H = 2160;
+    BAR_H = 0; VIDEO_H = H;
+    TOP_H = H / 3; BOTTOM_H = H / 3; BOTTOM_Y = TOP_H; STACK_H = H / 3;
+    updateLayoutVisibility();
+    if (allActiveReady()) drawFrame();
+    updateExportAvailability();
+    return;
+  }
+
+  layoutMode = "standard";
   const dims = ASPECT_RATIOS[key];
   if (!dims) return;
   canvas.width = dims.width;
   canvas.height = dims.height;
   canvas.style.aspectRatio = `${dims.width}/${dims.height}`;
-
-  W = canvas.width;
-  H = canvas.height;
-  // A solid black divider between the two clips - 2% of canvas height
-  // reads clearly as a deliberate gap without eating much frame. It
-  // needs no dedicated draw call: drawFrame() fills the whole canvas
-  // black first, so leaving this gap between the two drawHalf() calls
-  // is enough.
+  W = canvas.width; H = canvas.height;
   BAR_H = Math.round(H * 0.02);
   VIDEO_H = H - BAR_H;
-  // Top gets 1/3 of the remaining video area, bottom the other 2/3 -
-  // BOTTOM_H is derived as VIDEO_H - TOP_H (not VIDEO_H * 2/3) so the
-  // two sections always add up to exactly VIDEO_H with no rounding gap.
   TOP_H = VIDEO_H / 3;
   BOTTOM_H = VIDEO_H - TOP_H;
   BOTTOM_Y = TOP_H + BAR_H;
-
-  // drawHalf/drawFrame read W/H/TOP_H/etc fresh every call (nothing
-  // caches stale geometry), so redrawing here is all a ratio switch
-  // needs to re-run each clip's crop math against the new dimensions.
-  if (state.top.ready && state.bottom.ready) drawFrame();
+  STACK_H = H / 3;
+  updateLayoutVisibility();
+  if (allActiveReady()) drawFrame();
+  updateExportAvailability();
 }
 applyAspectRatio("9:16");
 
@@ -945,10 +1078,18 @@ function makeVideoEl() {
   return v;
 }
 
+function getSlotElementId(slotName, kind) {
+  if (slotName === "top") return kind === "name" ? "nameTop" : `${slotName}${kind}`;
+  if (slotName === "bottom") return kind === "name" ? "nameBottom" : `${slotName}${kind}`;
+  const n = slotName.replace("stack", "");
+  if (kind === "name") return `stackName${n}`;
+  return `stack${kind.charAt(0).toUpperCase() + kind.slice(1)}${n}`;
+}
+
 function loadFile(slotName, file) {
   const slot = state[slotName];
   setStatus(`Loading ${file.name}...`);
-  document.getElementById(slotName === "top" ? "nameTop" : "nameBottom").textContent = file.name;
+  document.getElementById(getSlotElementId(slotName, "name")).textContent = file.name;
 
   if (slot.url) URL.revokeObjectURL(slot.url);
   if (slot.video) slot.video.remove();
@@ -1000,7 +1141,7 @@ function loadFile(slotName, file) {
     slot.trimStart = 0;
     slot.trimEnd = v.duration;
     v.playbackRate = slot.speed;
-    updateTrimInputs(slotName);
+    if (slotName === "top" || slotName === "bottom") updateTrimInputs(slotName);
 
     // The top slot's 1.15x default zoom is tuned for portrait sources -
     // its own section shape is fairly wide (close to 16:9) already, so a
@@ -1013,6 +1154,17 @@ function loadFile(slotName, file) {
       slot.zoom = isLandscape ? 1 : 1.15;
       topZoomInput.value = String(slot.zoom);
       topZoomValue.textContent = slot.zoom.toFixed(2) + "x";
+    } else if (slotName.startsWith("stack")) {
+      slot.zoom = 1;
+      slot.panX = 0;
+      slot.panY = 0;
+      const n = slotName.replace("stack", "");
+      document.getElementById(`stackZoom${n}`).value = "1";
+      document.getElementById(`stackZoomValue${n}`).textContent = "1.00x";
+      document.getElementById(`stackPanX${n}`).value = "0";
+      document.getElementById(`stackPanY${n}`).value = "0";
+      document.getElementById(`stackPanXValue${n}`).textContent = "Center";
+      document.getElementById(`stackPanYValue${n}`).textContent = "Center";
     }
   });
   v.addEventListener("loadedmetadata", markReady);
@@ -1042,30 +1194,33 @@ function loadFile(slotName, file) {
 // this is the single source of truth either way rather than trusting
 // that invariant silently.
 function updateExportAvailability() {
-  const both = state.top.ready && state.bottom.ready;
-  const topValid = (state.top.trimEnd - state.top.trimStart) > 0;
-  const bottomValid = (state.bottom.trimEnd - state.bottom.trimStart) > 0;
-  exportBtn.disabled = !(both && topValid && bottomValid);
+  const activeSlots = getActiveSlots();
+  const ready = activeSlots.every(slot => slot.ready);
+  const valid = activeSlots.every(slot => (slot.trimEnd - slot.trimStart) > 0);
+  exportBtn.disabled = !(ready && valid);
 }
 
 function checkReady() {
-  const both = state.top.ready && state.bottom.ready;
-  playBtn.disabled = !both;
+  const activeNames = getActiveSlotNames();
+  const activeSlots = getActiveSlots();
+  const ready = activeSlots.every(slot => slot.ready);
+  playBtn.disabled = !ready;
   updateExportAvailability();
-  if (both) {
+
+  if (ready) {
     drawFrame();
     setStatus("");
     refreshAudioSegment();
-  } else if (state.top.ready && !state.bottom.ready) {
-    // Without this, the status line is left showing whatever "Loading
-    // ...' message came last - once the top clip finishes, that stale
-    // text just sits there looking exactly like a stuck/frozen load,
-    // even though loading actually succeeded and it's simply waiting on
-    // the still-empty bottom slot (this tool needs both before it can
-    // do anything - it's not broken, just not obviously waiting).
-    setStatus("Top clip ready — choose a bottom clip to continue.");
-  } else if (state.bottom.ready && !state.top.ready) {
+    return;
+  }
+
+  const missing = activeNames.find((name, i) => !activeSlots[i].ready);
+  if (missing && missing.startsWith("stack")) {
+    setStatus(`Video ${missing.replace("stack", "")} is ready to choose.`);
+  } else if (missing === "top" && state.bottom.ready) {
     setStatus("Bottom clip ready — choose a top clip to continue.");
+  } else if (missing === "bottom" && state.top.ready) {
+    setStatus("Top clip ready — choose a bottom clip to continue.");
   }
 }
 
@@ -1080,26 +1235,27 @@ function checkReady() {
 // source is wide enough that the crop already uses the full source
 // height (sh === vh, no vertical cropping happening at all), the slack
 // is zero and panY has no effect - there's nothing to move within.
-function drawHalf(video, filter, yOffset, sectionHeight, zoom = 1, panY = 0) {
+function drawCoverClip(video, filter, dx, dy, dw, dh, zoom = 1, panX = 0, panY = 0) {
   if (!video || video.readyState < 2) return;
   const vw = video.videoWidth, vh = video.videoHeight;
   if (!vw || !vh) return;
-  const targetRatio = W / sectionHeight;
+
+  const targetRatio = dw / dh;
   const srcRatio = vw / vh;
   let sx, sy, sw, sh;
+
   if (srcRatio > targetRatio) {
-    // source wider than target: crop sides
     sh = vh;
     sw = vh * targetRatio;
     sx = (vw - sw) / 2;
     sy = 0;
   } else {
-    // source taller than target: crop top/bottom
     sw = vw;
     sh = vw / targetRatio;
     sx = 0;
     sy = (vh - sh) / 2;
   }
+
   if (zoom !== 1) {
     const zsw = sw / zoom;
     const zsh = sh / zoom;
@@ -1108,14 +1264,20 @@ function drawHalf(video, filter, yOffset, sectionHeight, zoom = 1, panY = 0) {
     sw = zsw;
     sh = zsh;
   }
-  if (panY !== 0) {
-    const maxPanOffset = (vh - sh) / 2;
-    sy = Math.max(0, Math.min(vh - sh, sy + panY * maxPanOffset));
-  }
+
+  const maxPanX = Math.max(0, (vw - sw) / 2);
+  const maxPanY = Math.max(0, (vh - sh) / 2);
+  sx = Math.max(0, Math.min(vw - sw, sx + panX * maxPanX));
+  sy = Math.max(0, Math.min(vh - sh, sy + panY * maxPanY));
+
   ctx.save();
   ctx.filter = FILTERS[filter] || "none";
-  ctx.drawImage(video, sx, sy, sw, sh, 0, yOffset, W, sectionHeight);
+  ctx.drawImage(video, sx, sy, sw, sh, dx, dy, dw, dh);
   ctx.restore();
+}
+
+function drawHalf(video, filter, yOffset, sectionHeight, zoom = 1, panY = 0) {
+  drawCoverClip(video, filter, 0, yOffset, W, sectionHeight, zoom, 0, panY);
 }
 
 // Draws the caption text on top of both clips, wrapping on explicit
@@ -1163,8 +1325,16 @@ function drawTextOverlay() {
 function drawFrame() {
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, W, H);
-  drawHalf(state.top.video, state.top.filter, 0, TOP_H, state.top.zoom, state.top.panY);
-  drawHalf(state.bottom.video, state.bottom.filter, BOTTOM_Y, BOTTOM_H, state.bottom.zoom, state.bottom.panY);
+
+  if (isThreeStack()) {
+    [state.stack1, state.stack2, state.stack3].forEach((slot, i) => {
+      drawCoverClip(slot.video, slot.filter, 0, i * STACK_H, W, STACK_H, slot.zoom, slot.panX, slot.panY);
+    });
+  } else {
+    drawHalf(state.top.video, state.top.filter, 0, TOP_H, state.top.zoom, state.top.panY);
+    drawHalf(state.bottom.video, state.bottom.filter, BOTTOM_Y, BOTTOM_H, state.bottom.zoom, state.bottom.panY);
+  }
+
   drawTextOverlay();
 }
 
@@ -1232,7 +1402,7 @@ async function refreshAudioSegment(opts = {}) {
     setAudioStatus("");
     return;
   }
-  if (!state.top.ready || !state.bottom.ready) return;
+  if (!allActiveReady()) return;
 
   const outputDuration = getOutputDuration();
   if (outputDuration <= 0) {
@@ -1402,6 +1572,13 @@ document.getElementById("fileBottom").addEventListener("change", e => {
   }
 });
 
+[1, 2, 3].forEach(n => {
+  document.getElementById(`stackFile${n}`).addEventListener("change", e => {
+    if (e.target.files && e.target.files[0]) loadFile(`stack${n}`, e.target.files[0]);
+    else setStatus("No file detected from picker — try again.");
+  });
+});
+
 // Surface any runtime error instead of failing silently
 window.addEventListener("error", (e) => {
   setStatus("Error: " + (e.message || "something went wrong"));
@@ -1415,7 +1592,7 @@ document.querySelectorAll(".filter-row").forEach(row => {
       row.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       state[slotName].filter = btn.dataset.filter;
-      if (state.top.ready && state.bottom.ready) drawFrame();
+      if (allActiveReady()) drawFrame();
     });
   });
 });
@@ -1427,7 +1604,7 @@ topZoomInput.addEventListener("input", () => {
   const zoom = parseFloat(topZoomInput.value);
   state.top.zoom = zoom;
   topZoomValue.textContent = zoom.toFixed(2) + "x";
-  if (state.top.ready && state.bottom.ready) drawFrame();
+  if (allActiveReady()) drawFrame();
 });
 
 // --- Bottom clip zoom ---
@@ -1437,7 +1614,7 @@ bottomZoomInput.addEventListener("input", () => {
   const zoom = parseFloat(bottomZoomInput.value);
   state.bottom.zoom = zoom;
   bottomZoomValue.textContent = zoom.toFixed(2) + "x";
-  if (state.top.ready && state.bottom.ready) drawFrame();
+  if (allActiveReady()) drawFrame();
 });
 
 // --- Vertical position (pan) - lets a clip be re-centered within its
@@ -1458,7 +1635,7 @@ topPanInput.addEventListener("input", () => {
   const pan = parseFloat(topPanInput.value);
   state.top.panY = pan;
   topPanValue.textContent = formatPanLabel(pan);
-  if (state.top.ready && state.bottom.ready) drawFrame();
+  if (allActiveReady()) drawFrame();
 });
 
 const bottomPanInput = document.getElementById("bottomPan");
@@ -1467,7 +1644,41 @@ bottomPanInput.addEventListener("input", () => {
   const pan = parseFloat(bottomPanInput.value);
   state.bottom.panY = pan;
   bottomPanValue.textContent = formatPanLabel(pan);
-  if (state.top.ready && state.bottom.ready) drawFrame();
+  if (allActiveReady()) drawFrame();
+});
+
+function formatCentreLabel(value, axis) {
+  if (Math.abs(value) < 0.005) return "Center";
+  const pct = Math.round(Math.abs(value) * 100);
+  return axis === "x"
+    ? (value < 0 ? `Left ${pct}%` : `Right ${pct}%`)
+    : (value < 0 ? `Up ${pct}%` : `Down ${pct}%`);
+}
+
+[1, 2, 3].forEach(n => {
+  const slot = state[`stack${n}`];
+  const zoomInput = document.getElementById(`stackZoom${n}`);
+  const zoomValue = document.getElementById(`stackZoomValue${n}`);
+  const panXInput = document.getElementById(`stackPanX${n}`);
+  const panXValue = document.getElementById(`stackPanXValue${n}`);
+  const panYInput = document.getElementById(`stackPanY${n}`);
+  const panYValue = document.getElementById(`stackPanYValue${n}`);
+
+  zoomInput.addEventListener("input", () => {
+    slot.zoom = parseFloat(zoomInput.value) || 1;
+    zoomValue.textContent = slot.zoom.toFixed(2) + "x";
+    if (allActiveReady()) drawFrame();
+  });
+  panXInput.addEventListener("input", () => {
+    slot.panX = parseFloat(panXInput.value) || 0;
+    panXValue.textContent = formatCentreLabel(slot.panX, "x");
+    if (allActiveReady()) drawFrame();
+  });
+  panYInput.addEventListener("input", () => {
+    slot.panY = parseFloat(panYInput.value) || 0;
+    panYValue.textContent = formatCentreLabel(slot.panY, "y");
+    if (allActiveReady()) drawFrame();
+  });
 });
 
 // --- Per-clip trim range ---
@@ -1540,7 +1751,7 @@ function handleTrimChange(slotName, which) {
   }
 
   updateExportAvailability();
-  if (state.top.ready && state.bottom.ready) refreshAudioSegment({ forceNewStart: false });
+  if (allActiveReady()) refreshAudioSegment({ forceNewStart: false });
 }
 
 document.getElementById("topTrimStart").addEventListener("input", () => handleTrimChange("top", "start"));
@@ -1560,7 +1771,7 @@ function handleSpeedChange(slotName) {
   const select = document.getElementById(slotName + "Speed");
   slot.speed = parseFloat(select.value) || 1;
   if (slot.video) slot.video.playbackRate = slot.speed;
-  if (state.top.ready && state.bottom.ready) refreshAudioSegment({ forceNewStart: false });
+  if (allActiveReady()) refreshAudioSegment({ forceNewStart: false });
 }
 document.getElementById("topSpeed").addEventListener("change", () => handleSpeedChange("top"));
 document.getElementById("bottomSpeed").addEventListener("change", () => handleSpeedChange("bottom"));
@@ -1633,7 +1844,7 @@ document.querySelectorAll('input[name="outputMode"]').forEach(radio => {
     if (!radio.checked) return;
     outputState.mode = radio.value;
     document.getElementById("outputCustomRow").hidden = outputState.mode !== "custom";
-    if (state.top.ready && state.bottom.ready) refreshAudioSegment({ forceNewStart: false });
+    if (allActiveReady()) refreshAudioSegment({ forceNewStart: false });
   });
 });
 
@@ -1641,12 +1852,12 @@ const outputCustomInput = document.getElementById("outputCustomSeconds");
 outputCustomInput.addEventListener("input", () => {
   const v = parseFloat(outputCustomInput.value);
   if (!Number.isNaN(v)) outputState.customSeconds = Math.max(1, Math.min(60, v));
-  if (state.top.ready && state.bottom.ready) refreshAudioSegment({ forceNewStart: false });
+  if (allActiveReady()) refreshAudioSegment({ forceNewStart: false });
 });
 
 // --- Text overlay ---
 function redrawIfReady() {
-  if (state.top.ready && state.bottom.ready) drawFrame();
+  if (allActiveReady()) drawFrame();
 }
 
 document.getElementById("overlayText").addEventListener("input", e => {
@@ -1685,41 +1896,31 @@ document.getElementById("overlayBg").addEventListener("change", e => {
 let playing = false;
 let rafId = null;
 
-// Each clip loops independently within its own trim range - whichever
-// one reaches its trimEnd gets reset back to its own trimStart and kept
-// playing, with no dependency on what the other clip is doing. (Audio
-// loops separately too, on the output length - see startAudioPreview.)
 function previewLoop() {
-  if (state.top.video.currentTime >= state.top.trimEnd) {
-    state.top.video.currentTime = state.top.trimStart;
-    // Reaching its own natural end (trimEnd === the clip's real duration)
-    // auto-pauses a video (standard <video> behavior) - resetting
-    // currentTime alone doesn't resume it. .play() on an already-playing
-    // video is a harmless no-op, so this is safe to call unconditionally.
-    state.top.video.play();
-  }
-  if (state.bottom.video.currentTime >= state.bottom.trimEnd) {
-    state.bottom.video.currentTime = state.bottom.trimStart;
-    state.bottom.video.play();
+  for (const slot of getActiveSlots()) {
+    if (slot.video.currentTime >= slot.trimEnd) {
+      slot.video.currentTime = slot.trimStart;
+      slot.video.play();
+    }
   }
   drawFrame();
   if (playing) rafId = requestAnimationFrame(previewLoop);
 }
 
 playBtn.addEventListener("click", () => {
-  if (!state.top.ready || !state.bottom.ready) return;
+  if (!allActiveReady()) return;
   playing = !playing;
   playBtn.textContent = playing ? "Pause" : "Play";
+
   if (playing) {
-    state.top.video.currentTime = state.top.trimStart;
-    state.bottom.video.currentTime = state.bottom.trimStart;
-    state.top.video.play();
-    state.bottom.video.play();
+    for (const slot of getActiveSlots()) {
+      slot.video.currentTime = slot.trimStart;
+      slot.video.play();
+    }
     startAudioPreview();
     previewLoop();
   } else {
-    state.top.video.pause();
-    state.bottom.video.pause();
+    for (const slot of getActiveSlots()) slot.video.pause();
     stopAudioPreview();
     cancelAnimationFrame(rafId);
   }
@@ -1740,7 +1941,7 @@ async function buildFinalAudioBuffer(duration) {
   if (audioState.renderedBuffer) {
     sources.push({ buffer: audioState.renderedBuffer, offset: 0 });
   }
-  for (const slot of [state.top, state.bottom]) {
+  for (const slot of getActiveSlots()) {
     if (!slot.keepAudio || !slot.decodedAudio) continue;
     const trimmedLength = slot.trimEnd - slot.trimStart;
     sources.push({
@@ -1778,7 +1979,7 @@ async function buildFinalAudioBuffer(duration) {
 
 // --- Export (frame-accurate, seek-driven, via WebCodecs + mp4-muxer) ---
 exportBtn.addEventListener("click", async () => {
-  if (!state.top.ready || !state.bottom.ready) return;
+  if (!allActiveReady()) return;
   if (playing) { playBtn.click(); }
 
   if (typeof VideoEncoder === "undefined") {
@@ -1958,10 +2159,9 @@ exportBtn.addEventListener("click", async () => {
   try {
     for (let i = 0; i < frameCount; i++) {
       const t = i / fps;
-      await Promise.all([
-        seekTo(state.top.video, sourceTimeFor(state.top, t)),
-        seekTo(state.bottom.video, sourceTimeFor(state.bottom, t))
-      ]);
+      await Promise.all(
+        getActiveSlots().map(slot => seekTo(slot.video, sourceTimeFor(slot, t)))
+      );
       drawFrame();
 
       const frame = new VideoFrame(canvas, {
