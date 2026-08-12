@@ -748,7 +748,7 @@
   <div class="three-stack-controls" id="threeStackControls" hidden>
     <div class="three-stack-header">
       <h2>3 × Horizontal stack</h2>
-      <span>3840 × 2160 · three equal 720px panels</span>
+      <span>3840 × 2160 · three equal 1280px panels</span>
     </div>
     <div class="stack-slots">
       <div class="stack-slot">
@@ -1001,7 +1001,7 @@ const ctx = canvas.getContext("2d");
 // Canvas geometry is derived state, not fixed constants - aspect ratio
 // presets change canvas.width/height at runtime (see applyAspectRatio),
 // and everything below is recomputed from whatever those currently are.
-let W, H, BAR_H, VIDEO_H, TOP_H, BOTTOM_H, BOTTOM_Y, STACK_H;
+let W, H, BAR_H, VIDEO_H, TOP_H, BOTTOM_H, BOTTOM_Y, STACK_W;
 
 const ASPECT_RATIOS = {
   "9:16": { width: 1080, height: 1920 },
@@ -1024,7 +1024,11 @@ function applyAspectRatio(key) {
     canvas.style.aspectRatio = "3840/2160";
     W = 3840; H = 2160;
     BAR_H = 0; VIDEO_H = H;
-    TOP_H = H / 3; BOTTOM_H = H / 3; BOTTOM_Y = TOP_H; STACK_H = H / 3;
+    // Three vertical columns side by side (left/centre/right), each the
+    // full canvas height and exactly a third of the width - 3840/3 =
+    // 1280 per panel. Not stacked rows: "3 x Horizontal" names the
+    // overall 3840x2160 landscape output, not the panel arrangement.
+    STACK_W = W / 3;
     updateLayoutVisibility();
     if (allActiveReady()) drawFrame();
     updateExportAvailability();
@@ -1043,12 +1047,11 @@ function applyAspectRatio(key) {
   TOP_H = VIDEO_H / 3;
   BOTTOM_H = VIDEO_H - TOP_H;
   BOTTOM_Y = TOP_H + BAR_H;
-  STACK_H = H / 3;
+  STACK_W = W / 3; // unused outside 3-stack mode; kept defined for consistency
   updateLayoutVisibility();
   if (allActiveReady()) drawFrame();
   updateExportAvailability();
 }
-applyAspectRatio("9:16");
 
 document.querySelectorAll('input[name="aspectRatio"]').forEach(radio => {
   radio.addEventListener("change", () => {
@@ -1061,6 +1064,21 @@ const exportBtn = document.getElementById("exportBtn");
 const statusEl = document.getElementById("status");
 const progressWrap = document.getElementById("progressWrap");
 const progressBar = document.getElementById("progressBar");
+
+// Root-cause fix: this initial call was previously made immediately
+// after applyAspectRatio() was defined (before exportBtn's own const
+// declaration below it) - applyAspectRatio() unconditionally calls
+// updateExportAvailability(), which reads exportBtn, so calling it
+// this early threw "Cannot access 'exportBtn' before initialization"
+// (a temporal-dead-zone ReferenceError) on every page load. That
+// uncaught top-level exception silently aborted the rest of this
+// script - every addEventListener registered below it (every file
+// input's "change" handler included) never ran, which is why
+// selecting a video never updated "No file selected" for anyone.
+// Moving this call to after every const it transitively depends on
+// (exportBtn here) is the entire fix - the function itself was never
+// wrong.
+applyAspectRatio("9:16");
 
 function setStatus(msg) { statusEl.textContent = msg || ""; }
 
@@ -1327,8 +1345,10 @@ function drawFrame() {
   ctx.fillRect(0, 0, W, H);
 
   if (isThreeStack()) {
+    // Video 1 -> left, Video 2 -> centre, Video 3 -> right - each its
+    // own STACK_W-wide (1280px), full-height (2160px) column.
     [state.stack1, state.stack2, state.stack3].forEach((slot, i) => {
-      drawCoverClip(slot.video, slot.filter, 0, i * STACK_H, W, STACK_H, slot.zoom, slot.panX, slot.panY);
+      drawCoverClip(slot.video, slot.filter, i * STACK_W, 0, STACK_W, H, slot.zoom, slot.panX, slot.panY);
     });
   } else {
     drawHalf(state.top.video, state.top.filter, 0, TOP_H, state.top.zoom, state.top.panY);
