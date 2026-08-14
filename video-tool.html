@@ -90,6 +90,17 @@
     grid-template-columns: 1fr 1fr;
     gap: 14px;
   }
+  /* 3-Stack UI Cleanup - .controls' own `display: grid` above is an
+     author-stylesheet rule, so it always wins over the browser's default
+     `[hidden] { display: none }` UA rule regardless of selector
+     specificity (author origin beats user-agent origin in the cascade).
+     applyAspectRatio()/updateLayoutVisibility() already set
+     .controls.hidden = true correctly when 3-stack mode is selected -
+     nothing there was broken - this was the only missing piece needed
+     for that attribute to actually take visual effect. */
+  .controls[hidden] {
+    display: none;
+  }
   @media (min-width: 960px) {
     body { padding: 24px 32px 40px; }
     .layout {
@@ -643,7 +654,7 @@
       <label><input type="radio" name="aspectRatio" value="9:16" checked> 9:16 (Reels/Stories)</label>
       <label><input type="radio" name="aspectRatio" value="1:1"> 1:1 (Square)</label>
       <label><input type="radio" name="aspectRatio" value="4:5"> 4:5 (Feed)</label>
-      <label><input type="radio" name="aspectRatio" value="3-stack"> 3 × Horizontal (3840×2160)</label>
+      <label><input type="radio" name="aspectRatio" value="3-stack"> 3 × Horizontal — Stacked (1080×1920)</label>
     </div>
   </div>
 
@@ -747,8 +758,8 @@
 
   <div class="three-stack-controls" id="threeStackControls" hidden>
     <div class="three-stack-header">
-      <h2>3 × Horizontal stack</h2>
-      <span>3840 × 2160 · three equal 1280px panels</span>
+      <h2>3 × Horizontal — Stacked</h2>
+      <span>1080 × 1920 (9:16) final video · three horizontal (16:9) clips, top / middle / bottom, each cropped to a 1080×640 band</span>
     </div>
     <div class="stack-slots">
       <div class="stack-slot">
@@ -1001,7 +1012,7 @@ const ctx = canvas.getContext("2d");
 // Canvas geometry is derived state, not fixed constants - aspect ratio
 // presets change canvas.width/height at runtime (see applyAspectRatio),
 // and everything below is recomputed from whatever those currently are.
-let W, H, BAR_H, VIDEO_H, TOP_H, BOTTOM_H, BOTTOM_Y, STACK_W;
+let W, H, BAR_H, VIDEO_H, TOP_H, BOTTOM_H, BOTTOM_Y, STACK_W, STACK_H;
 
 const ASPECT_RATIOS = {
   "9:16": { width: 1080, height: 1920 },
@@ -1019,16 +1030,30 @@ function updateLayoutVisibility() {
 function applyAspectRatio(key) {
   if (key === "3-stack") {
     layoutMode = "3-stack";
-    canvas.width = 3840;
-    canvas.height = 2160;
-    canvas.style.aspectRatio = "3840/2160";
-    W = 3840; H = 2160;
+    // Root-cause fix: "3 x Horizontal" means three horizontal (16:9)
+    // source clips stacked one above another - video 1 top, video 2
+    // middle, video 3 bottom - inside one 9:16 portrait final video
+    // (1080x1920, matching every other export from this tool), not a
+    // wide landscape canvas of its own. A previous pass here produced
+    // a 3840x720 (or 1280x2160) canvas - correct panel math for a
+    // horizontal-strip export, but not the 9:16 portrait deliverable
+    // this mode is actually for. The canvas is fixed at 1080x1920;
+    // each panel is the full canvas width (1080) and exactly a third
+    // of the canvas height (1920/3 = 640, no remainder). A 1080x640
+    // panel is itself 27:16, not 16:9 - it's a cropped *window* onto
+    // each 16:9 source, filled the same cover-fit way drawCoverClip
+    // already fills every other layout's panels (crop-to-cover, never
+    // stretch), so the source's own aspect ratio is never distorted.
+    canvas.width = 1080;
+    canvas.height = 1920;
+    canvas.style.aspectRatio = "1080/1920";
+    W = 1080; H = 1920;
     BAR_H = 0; VIDEO_H = H;
-    // Three vertical columns side by side (left/centre/right), each the
-    // full canvas height and exactly a third of the width - 3840/3 =
-    // 1280 per panel. Not stacked rows: "3 x Horizontal" names the
-    // overall 3840x2160 landscape output, not the panel arrangement.
-    STACK_W = W / 3;
+    // STACK_W = full canvas width, STACK_H = one third of the canvas
+    // height - see drawFrame()'s isThreeStack() branch for how these
+    // place video 1/2/3 top/middle/bottom.
+    STACK_W = W;
+    STACK_H = H / 3;
     updateLayoutVisibility();
     if (allActiveReady()) drawFrame();
     updateExportAvailability();
@@ -1047,7 +1072,7 @@ function applyAspectRatio(key) {
   TOP_H = VIDEO_H / 3;
   BOTTOM_H = VIDEO_H - TOP_H;
   BOTTOM_Y = TOP_H + BAR_H;
-  STACK_W = W / 3; // unused outside 3-stack mode; kept defined for consistency
+  STACK_W = W; STACK_H = H / 3; // unused outside 3-stack mode; kept defined for consistency
   updateLayoutVisibility();
   if (allActiveReady()) drawFrame();
   updateExportAvailability();
@@ -1345,10 +1370,15 @@ function drawFrame() {
   ctx.fillRect(0, 0, W, H);
 
   if (isThreeStack()) {
-    // Video 1 -> left, Video 2 -> centre, Video 3 -> right - each its
-    // own STACK_W-wide (1280px), full-height (2160px) column.
+    // Video 1 -> top, Video 2 -> middle, Video 3 -> bottom - each its
+    // own full-width (STACK_W = 1080px), STACK_H-tall (640px) band,
+    // stacked vertically down the 1080x1920 (9:16) canvas. Each
+    // horizontal (16:9) source is cover-cropped to fill its 1080x640
+    // band via drawCoverClip - same crop-not-stretch mechanism every
+    // other layout already uses, so zoom/X/Y positioning keep working
+    // and the source's own aspect ratio is never distorted.
     [state.stack1, state.stack2, state.stack3].forEach((slot, i) => {
-      drawCoverClip(slot.video, slot.filter, i * STACK_W, 0, STACK_W, H, slot.zoom, slot.panX, slot.panY);
+      drawCoverClip(slot.video, slot.filter, 0, i * STACK_H, STACK_W, STACK_H, slot.zoom, slot.panX, slot.panY);
     });
   } else {
     drawHalf(state.top.video, state.top.filter, 0, TOP_H, state.top.zoom, state.top.panY);
