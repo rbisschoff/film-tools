@@ -867,7 +867,7 @@
     <h2>Photo Printing Animation</h2>
     <label class="file-btn" for="photoPrintFile">Choose photo (JPEG, PNG or WebP)</label>
     <input type="file" id="photoPrintFile" accept="image/jpeg,image/png,image/webp" class="file-input-hidden">
-    <div class="filename" id="photoPrintName">No photo selected</div>
+    <div class="filename" id="photoPrintName">Showing a sample photo — choose your own photo to export.</div>
     <div class="photo-print-grid">
       <div class="zoom-row">
         <label class="zoom-label" for="photoPrintDuration">Animation duration <span id="photoPrintDurationValue">8.0s</span></label>
@@ -1057,7 +1057,8 @@ const photoPrint = {
   printer: "instax",    // "instax" | "qx20" | "generic" | "selphy" (classic desktop)
   background: "beach",  // "beach" | "balcony" | "bedroom" | "studio"
   format: "9:16",
-  progress: 0,          // 0..1 - the single value preview and export both draw from
+  progress: 1,          // 0..1 - the single value preview and export both draw from
+                        // (starts on the finished print, showing the sample photo)
   baseProgress: 0,
   startTime: 0,
   playing: false,
@@ -1249,7 +1250,7 @@ function applyPhotoPrintLayout() {
   Object.keys(PP_PHOTO_SCENES).forEach(name => ppEnsurePhoto(name));
   updatePhotoPrintBgNote();
   drawFrame();
-  playBtn.disabled = !photoPrint.image || photoPrint.exporting;
+  playBtn.disabled = photoPrint.exporting; // the sample photo can be previewed too
   updateExportAvailability();
 }
 
@@ -1413,6 +1414,7 @@ function loadFile(slotName, file) {
 // that invariant silently.
 function updateExportAvailability() {
   if (isPhotoPrint()) {
+    // Export needs the user's own photo - never the built-in sample.
     exportBtn.disabled = !photoPrint.image || photoPrint.exporting;
     return;
   }
@@ -1426,7 +1428,7 @@ function checkReady() {
   // A video can finish loading in the background while the photo
   // animation is showing - it must not take over the transport/canvas.
   if (isPhotoPrint()) {
-    playBtn.disabled = !photoPrint.image || photoPrint.exporting;
+    playBtn.disabled = photoPrint.exporting; // the sample photo can be previewed too
     updateExportAvailability();
     return;
   }
@@ -2760,6 +2762,107 @@ function ppNoise() {
   x.putImageData(img, 0, 0);
   return ppNoiseTile;
 }
+
+// --- Built-in sample photo ---
+// Shown in the printer until the user picks their own photo, so the
+// photo-first composition is visible straight away. Drawn in code (a
+// tropical sunset over the sea), so there's no extra file or licence -
+// and seeded, so every frame of every preview draws identical pixels.
+// Never exported: export stays disabled until a real photo is chosen.
+let ppSampleCanvas = null;
+function ppSampleImage() {
+  if (ppSampleCanvas) return ppSampleCanvas;
+  const W = 1500, H = 1000, hz = H * 0.56; // horizon
+  const c = ppMakeCanvas(W, H);
+  const x = c.getContext("2d");
+  const rnd = ppRng(2024);
+  // Sky: deep blue overhead to warm peach at the horizon
+  const sky = x.createLinearGradient(0, 0, 0, hz);
+  sky.addColorStop(0, "#2f4f86");
+  sky.addColorStop(0.45, "#a77a9a");
+  sky.addColorStop(0.78, "#f2a774");
+  sky.addColorStop(1, "#ffd39a");
+  x.fillStyle = sky;
+  x.fillRect(0, 0, W, hz);
+  // Sun with a soft glow, low over the sea
+  const sx = W * 0.64, sy = hz - H * 0.07;
+  const glow = x.createRadialGradient(sx, sy, 0, sx, sy, H * 0.55);
+  glow.addColorStop(0, "rgba(255,240,200,0.95)");
+  glow.addColorStop(0.12, "rgba(255,214,150,0.55)");
+  glow.addColorStop(1, "rgba(255,190,130,0)");
+  x.fillStyle = glow;
+  x.fillRect(0, 0, W, hz);
+  x.fillStyle = "#fff4d8";
+  x.beginPath(); x.arc(sx, sy, H * 0.055, 0, Math.PI * 2); x.fill();
+  // Thin streaks of cloud lit from below
+  for (let i = 0; i < 7; i++) {
+    const cy = hz * (0.18 + 0.55 * rnd()), cx = W * rnd(), cw = W * (0.18 + 0.3 * rnd());
+    const cl = x.createLinearGradient(cx - cw / 2, 0, cx + cw / 2, 0);
+    cl.addColorStop(0, "rgba(255,200,170,0)");
+    cl.addColorStop(0.5, `rgba(255,${190 + Math.round(40 * rnd())},170,${(0.25 + 0.25 * rnd()).toFixed(2)})`);
+    cl.addColorStop(1, "rgba(255,200,170,0)");
+    x.fillStyle = cl;
+    x.beginPath(); x.ellipse(cx, cy, cw / 2, H * (0.008 + 0.012 * rnd()), 0, 0, Math.PI * 2); x.fill();
+  }
+  // Distant islands on the horizon
+  x.fillStyle = "#5a4a64";
+  x.beginPath(); x.moveTo(0, hz);
+  x.quadraticCurveTo(W * 0.10, hz - H * 0.09, W * 0.22, hz - H * 0.03);
+  x.quadraticCurveTo(W * 0.30, hz - H * 0.06, W * 0.38, hz);
+  x.closePath(); x.fill();
+  x.beginPath(); x.moveTo(W * 0.80, hz);
+  x.quadraticCurveTo(W * 0.88, hz - H * 0.05, W * 0.97, hz);
+  x.closePath(); x.fill();
+  // Sea, darkening towards the viewer, with the sun's glitter path
+  const sea = x.createLinearGradient(0, hz, 0, H);
+  sea.addColorStop(0, "#e9a77d");
+  sea.addColorStop(0.25, "#7f6f8c");
+  sea.addColorStop(1, "#22334f");
+  x.fillStyle = sea;
+  x.fillRect(0, hz, W, H - hz);
+  for (let i = 0; i < 260; i++) {
+    const t = rnd();
+    const y = hz + 2 + (H - hz) * t * t;
+    const spread = W * (0.02 + 0.16 * t);
+    const gx = sx + (rnd() - 0.5) * 2 * spread;
+    const len = W * (0.006 + 0.03 * t) * (0.5 + rnd());
+    x.fillStyle = `rgba(255,${215 + Math.round(30 * rnd())},170,${(0.35 + 0.5 * rnd() * (1 - t * 0.5)).toFixed(2)})`;
+    x.fillRect(gx - len / 2, y, len, Math.max(1.5, H * 0.003 * (0.5 + t)));
+  }
+  // Foreground: dark beach and a leaning palm in silhouette
+  x.fillStyle = "#1b1a26";
+  x.beginPath(); x.moveTo(0, H);
+  x.lineTo(0, H * 0.84);
+  x.quadraticCurveTo(W * 0.18, H * 0.80, W * 0.42, H * 0.93);
+  x.lineTo(W * 0.48, H);
+  x.closePath(); x.fill();
+  const bx = W * 0.12, by = H * 0.86, tx = W * 0.27, ty = H * 0.22;
+  x.strokeStyle = "#1b1a26";
+  x.lineCap = "round";
+  x.lineWidth = W * 0.016;
+  x.beginPath(); x.moveTo(bx, by); x.quadraticCurveTo(W * 0.15, H * 0.45, tx, ty); x.stroke();
+  for (let i = 0; i < 9; i++) {
+    const a = -Math.PI * 0.95 + (i / 8) * Math.PI * 1.25 + (rnd() - 0.5) * 0.2;
+    const L = W * (0.13 + 0.06 * rnd());
+    const ex = tx + Math.cos(a) * L, ey = ty + Math.sin(a) * L * 0.6 + L * 0.35;
+    x.lineWidth = W * 0.007;
+    x.beginPath(); x.moveTo(tx, ty);
+    x.quadraticCurveTo(tx + Math.cos(a) * L * 0.55, ty + Math.sin(a) * L * 0.55 - L * 0.12, ex, ey);
+    x.stroke();
+    for (let k = 1; k <= 9; k++) {   // leaflets
+      const f = k / 10, px = tx + (ex - tx) * f, py = ty + (ey - ty) * f - Math.sin(f * Math.PI) * L * 0.12;
+      x.lineWidth = W * 0.003;
+      x.beginPath(); x.moveTo(px, py); x.lineTo(px + Math.cos(a + 1.2) * L * 0.12 * (1 - f * 0.6), py + L * 0.1 * (1 - f * 0.5)); x.stroke();
+      x.beginPath(); x.moveTo(px, py); x.lineTo(px + Math.cos(a - 1.2) * L * 0.12 * (1 - f * 0.6), py + L * 0.1 * (1 - f * 0.5)); x.stroke();
+    }
+  }
+  ppGrain(x, 0, 0, W, H, 0.10);
+  ppSampleCanvas = c;
+  return c;
+}
+
+// The photo on the print: the user's, or the sample until they pick one.
+function ppPrintImage() { return photoPrint.image || ppSampleImage(); }
 
 // Fine material/film grain over whatever is currently clipped.
 function ppGrain(c, x, y, w, h, alpha) {
@@ -4227,10 +4330,13 @@ function ppRealScaleLayout(spec, img, w, h, model, image) {
 // it (as in a close-up product shot). Caps per format keep the print
 // fully in frame with breathing room and stop the printer filling the
 // width.
+// minPh: the print is never shown smaller than this share of the frame
+// height (matters for the small Instax card, whose ~2x size would still
+// leave the tall printer body dominating the frame).
 const PP_HERO_CAPS = {
-  tall:   { ph: 0.40, pw: 0.72, PW: 0.90 },  // 9:16
-  square: { ph: 0.50, pw: 0.62, PW: 0.80 },  // 1:1
-  wide:   { ph: 0.60, pw: 0.56, PW: 0.64 }   // 16:9
+  tall:   { ph: 0.40, pw: 0.72, PW: 0.90, minPh: 0.38 },  // 9:16
+  square: { ph: 0.50, pw: 0.62, PW: 0.80, minPh: 0.46 },  // 1:1
+  wide:   { ph: 0.60, pw: 0.56, PW: 0.64, minPh: 0.52 }   // 16:9
 };
 function ppFrameShape(w, h) { return h > w * 1.2 ? "tall" : w > h * 1.2 ? "wide" : "square"; }
 
@@ -4238,15 +4344,21 @@ function ppHeroPW(w, h, model, image, refPW) {
   const m = PP_MODELS[model];
   const [pwU, phU] = ppPaperSize(m, image);
   const cap = PP_HERO_CAPS[ppFrameShape(w, h)];
-  return Math.min(refPW * 2, (cap.ph * h) / phU, (cap.pw * w) / pwU, cap.PW * w);
+  const target = Math.max(refPW * 2, (cap.minPh * h) / phU);
+  return Math.min(target, (cap.ph * h) / phU, (cap.pw * w) / pwU, cap.PW * w);
 }
 
 // Vertical placement: the whole printer + finished print centred in the
 // frame when it fits; otherwise the print keeps a fixed top margin and
-// the printer runs off the bottom edge.
-function ppHeroBase(h, PW, units) {
+// the printer runs off the bottom edge. The printer is the supporting
+// object, so at most 0.85x the print's height of it shows below the
+// slot: a taller body (the upright Instax) is cropped by the bottom edge
+// instead, moving the print down no further than the frame's centre.
+function ppHeroBase(h, PW, units, ph) {
   const total = units * PW;
-  const paperTop = Math.max(h * 0.055, (h - total) * 0.5);
+  let paperTop = Math.max(h * 0.055, (h - total) * 0.5);
+  const showPrinterTop = h - ph * 0.85 - ph * PP_FINAL_OUT; // paper top that leaves 0.85*ph of printer
+  if (showPrinterTop > paperTop) paperTop = Math.max(paperTop, Math.min(showPrinterTop, h * 0.5 - ph / 2));
   return paperTop + total;
 }
 
@@ -4257,7 +4369,8 @@ function ppStudioAnchor(w, h, model, image) {
   const units = ppStackUnits(model, image, 1);
   const refPW = Math.min(w * m.sizeFrac, (h * 0.64) / units);
   const PW = ppHeroPW(w, h, model, image, refPW);
-  return { PW, base: ppHeroBase(h, PW, units), cx: w / 2, topScale: 1 };
+  const ph = PW * ppPaperSize(m, image)[1];
+  return { PW, base: ppHeroBase(h, PW, units, ph), cx: w / 2, topScale: 1 };
 }
 
 // Photographic scenes: printer/print at the photo-first size, and the
@@ -4270,7 +4383,7 @@ function ppPhotoLayout(spec, img, w, h, model, image) {
   const ref = ppRealScaleLayout(spec, img, w, h, model, image);
   const units = ppStackUnits(model, image, spec.topScale);
   const PW = ppHeroPW(w, h, model, image, ref.anchor.PW);
-  const base = ppHeroBase(h, PW, units);
+  const base = ppHeroBase(h, PW, units, PW * ppPaperSize(PP_MODELS[model], image)[1]);
   const iw = img.width, ih = img.height;
   const cover = Math.max(w / iw, h / ih);
   const realS = PW / (PP_MODEL_MM[model] * spec.pxPerMm);
@@ -4502,8 +4615,9 @@ function drawPhotoPrintScene(p) {
   const sceneName = PP_SCENES[photoPrint.background] ? photoPrint.background : "studio";
   // Studio gets the photo-first framing too; the illustrated scenes (only
   // a fallback while a background photo loads, or on file://) keep theirs.
-  const anchor = sceneName === "studio" ? ppStudioAnchor(w, h, photoPrint.printer, photoPrint.image) : undefined;
-  const g = photoPrintGeometry(w, h, photoPrint.image, photoPrint.printer, anchor);
+  const image = ppPrintImage(); // the user's photo, or the sample until one is chosen
+  const anchor = sceneName === "studio" ? ppStudioAnchor(w, h, photoPrint.printer, image) : undefined;
+  const g = photoPrintGeometry(w, h, image, photoPrint.printer, anchor);
   const timing = photoPrintTiming(ppClamp01(p), photoPrint.speed);
   const sc = PP_SCENES[sceneName];
   ctx.save();
@@ -4524,7 +4638,7 @@ function drawPhotoPrintScene(p) {
     ppDrawContactShadow(ctx, g);
   } else {
     ctx.drawImage(ppGetSceneCanvas(sceneName, w, h, g), 0, 0);
-    const emergedPx = photoPrint.image ? timing.emerge * g.ph * PP_FINAL_OUT : 0;
+    const emergedPx = timing.emerge * g.ph * PP_FINAL_OUT;
     ppDrawCastShadow(ctx, g, sc, emergedPx);
     ppDrawSceneContact(ctx, g, sc);
   }
@@ -4536,7 +4650,7 @@ function drawPhotoPrintScene(p) {
   ctx.translate(0, vib);
 
   ppDrawPrinterBack(ctx, g);
-  if (photoPrint.image) ppDrawPaper(ctx, g, timing, photoPrint.image);
+  ppDrawPaper(ctx, g, timing, image);
   ppDrawPrinterFront(ctx, g, timing);
   if (sceneName !== "studio") ppDrawSceneLighting(ctx, g, sc);
   ppDrawPrinterLights(ctx, g, timing);
@@ -4552,8 +4666,9 @@ function drawPhotoPrintScene(p) {
 function drawPhotoPrintPhotoScene(p, name, spec, pst) {
   const w = canvas.width, h = canvas.height;
   const scale = Math.min(w, h) / 1080;
-  const L = ppPhotoLayout(spec, pst.img, w, h, photoPrint.printer, photoPrint.image);
-  const g = photoPrintGeometry(w, h, photoPrint.image, photoPrint.printer, L.anchor);
+  const image = ppPrintImage(); // the user's photo, or the sample until one is chosen
+  const L = ppPhotoLayout(spec, pst.img, w, h, photoPrint.printer, image);
+  const g = photoPrintGeometry(w, h, image, photoPrint.printer, L.anchor);
   const timing = photoPrintTiming(ppClamp01(p), photoPrint.speed);
   const [R, G, B] = pst.surfaceRGB;
   const k = spec.shadow.darken;
@@ -4565,7 +4680,7 @@ function drawPhotoPrintPhotoScene(p, name, spec, pst) {
   ctx.filter = "none";
   ctx.drawImage(ppPhotoBackground(name, pst.img, w, h, L, spec.dof), 0, 0);
 
-  const emergedPx = photoPrint.image ? timing.emerge * g.ph * PP_FINAL_OUT : 0;
+  const emergedPx = timing.emerge * g.ph * PP_FINAL_OUT;
   ppDrawCastShadow(ctx, g, { shadow: { ...spec.shadow, rgb: shadowRGB } }, emergedPx);
   ppDrawPhotoContact(ctx, g, spec, shadowRGB);
   const surfaceCap = ppCaptureSurface(ctx, g, spec);
@@ -4576,7 +4691,7 @@ function drawPhotoPrintPhotoScene(p, name, spec, pst) {
   const lc = ppSubjectLayer(w, h);
   lc.translate(0, vib);
   ppDrawPrinterBack(lc, g);
-  if (photoPrint.image) ppDrawPaper(lc, g, timing, photoPrint.image);
+  ppDrawPaper(lc, g, timing, image);
   ppDrawPrinterFront(lc, g, timing);
   ppLightSubject(lc, g, spec, g.slotY - emergedPx);
 
@@ -4683,7 +4798,6 @@ function photoPrintLoop() {
   photoPrint.rafId = requestAnimationFrame(photoPrintLoop);
 }
 function playPhotoPrint() {
-  if (!photoPrint.image) return;
   if (photoPrint.progress >= 1) photoPrint.progress = 0; // restart after completion
   photoPrint.baseProgress = photoPrint.progress;
   photoPrint.startTime = performance.now();
@@ -4893,7 +5007,7 @@ async function exportPhotoPrint() {
     progressWrap.classList.remove("active");
     setTimeout(() => progressBar.style.width = "0%", 600);
     if (isPhotoPrint()) {
-      playBtn.disabled = !photoPrint.image;
+      playBtn.disabled = false;
       updateExportAvailability();
       drawFrame();
     }
