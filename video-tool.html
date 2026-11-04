@@ -2065,6 +2065,46 @@ async function buildFinalAudioBuffer(duration) {
   return offlineCtx.startRendering();
 }
 
+// --- Encoder selection (hardware with software fallback) ---
+// Some Windows hardware H.264 encoders (Media Foundation) report the
+// config as supported but then reject every RGBA VideoFrame captured
+// from a canvas with "Encoding error. (Unexpected frame format.)" -
+// isConfigSupported() can't detect that, only a real encode can. So
+// before export starts, encode one real frame of the current canvas
+// with the default (usually hardware) encoder; if that fails, retry
+// with hardwareAcceleration "prefer-software", which accepts RGBA.
+// Returns a config known to work on this machine, or null.
+async function testEncodeOneFrame(config) {
+  let produced = false, failed = false;
+  const enc = new VideoEncoder({ output: () => { produced = true; }, error: () => { failed = true; } });
+  try {
+    enc.configure(config);
+    const frame = new VideoFrame(canvas, { timestamp: 0 });
+    enc.encode(frame, { keyFrame: true });
+    frame.close();
+    await enc.flush();
+  } catch (err) {
+    failed = true;
+  }
+  try { if (enc.state !== "closed") enc.close(); } catch (err) { /* already closed */ }
+  return produced && !failed;
+}
+
+async function chooseVideoEncoderConfig(width, height, fps) {
+  const base = { codec: "avc1.640034", width, height, bitrate: 20_000_000, framerate: fps };
+  for (const hw of [null, "prefer-software"]) {
+    const config = hw ? { ...base, hardwareAcceleration: hw } : base;
+    try {
+      const support = await VideoEncoder.isConfigSupported(config);
+      if (!support.supported) continue;
+    } catch (err) {
+      continue;
+    }
+    if (await testEncodeOneFrame(config)) return config;
+  }
+  return null;
+}
+
 // --- Export (frame-accurate, seek-driven, via WebCodecs + mp4-muxer) ---
 exportBtn.addEventListener("click", async () => {
   if (!allActiveReady()) return;
@@ -2199,6 +2239,16 @@ exportBtn.addEventListener("click", async () => {
     }
   }
 
+  setStatus("Checking video encoder...");
+  const encoderConfig = await chooseVideoEncoderConfig(W, H, fps);
+  if (!encoderConfig) {
+    setStatus("Export failed: no working H.264 encoder was found in this browser — please try Chrome or Edge.");
+    exportBtn.disabled = false;
+    playBtn.disabled = false;
+    progressWrap.classList.remove("active");
+    return;
+  }
+
   const muxerConfig = {
     target: new ArrayBufferTarget(),
     video: {
@@ -2228,13 +2278,7 @@ exportBtn.addEventListener("click", async () => {
     }
   });
 
-  encoder.configure({
-    codec: "avc1.640034",
-    width: W,
-    height: H,
-    bitrate: 20_000_000,
-    framerate: fps
-  });
+  encoder.configure(encoderConfig);
 
   // Export Stutter Fix - root cause: each output frame i seeks every
   // clip to i/fps (via sourceTimeFor). For a source at the same frame
