@@ -4099,15 +4099,15 @@ const PP_PHOTO_SCENES = {
     surfaceX: 0.50, surfaceY: 0.885, pxPerMm: 2.8, topScale: 1.0,
     light: { filter: "brightness(1.07) saturate(1.04) sepia(0.05)", from: "right", warm: "rgba(255,238,210,0.32)", cool: "rgba(60,90,130,0.20)", rim: "rgba(255,248,232,0.35)" },
     shadow: { dx: -0.32, dy: 0.12, alpha: 0.42, blur: 0.035, darken: 0.42 },
-    contact: 0.55, surface: "sand", blur: 0, grain: 0.025,
+    contact: 0.55, surface: "sand", blur: 0, grain: 0.025, dof: { near: 1.2, far: 6.5 }, bgZoom: 0.8,
     credit: "Beach photo: Ann Kolisnyk, Ko Samui (Unsplash)"
   },
   balcony: {
     src: "assets/photo-print/tropical-terrace-table.jpg",
     surfaceX: 0.215, surfaceY: 0.875, pxPerMm: 2.6, topScale: 1.45,
-    light: { filter: "brightness(0.78) saturate(0.92) sepia(0.04)", from: "back", warm: "rgba(255,246,228,0.22)", cool: "rgba(20,30,40,0.25)", rim: "rgba(255,250,236,0.60)" },
+    light: { filter: "brightness(0.93) saturate(0.97) sepia(0.03)", from: "back", warm: "rgba(255,246,228,0.22)", cool: "rgba(20,30,40,0.25)", rim: "rgba(255,250,236,0.60)" },
     shadow: { dx: 0.10, dy: -0.05, alpha: 0.40, blur: 0.09, darken: 0.30 },
-    contact: 0.75, surface: "table", blur: 0.35, grain: 0.03,
+    contact: 0.75, surface: "table", blur: 0, grain: 0.03, dof: { near: 1.4, far: 7.5 }, bgZoom: 0.8,
     credit: "Terrace photo: Meg von Haartman, Tulum (Unsplash)"
   },
   bedroom: {
@@ -4115,7 +4115,7 @@ const PP_PHOTO_SCENES = {
     surfaceX: 0.42, surfaceY: 0.79, pxPerMm: 3.1, topScale: 1.35,
     light: { filter: "brightness(1.03) saturate(0.92) sepia(0.10)", from: "right", warm: "rgba(255,240,214,0.40)", cool: "rgba(70,72,90,0.22)", rim: "rgba(255,246,226,0.30)" },
     shadow: { dx: -0.38, dy: 0.07, alpha: 0.30, blur: 0.09, darken: 0.55 },
-    contact: 0.38, surface: "duvet", blur: 0.6, grain: 0.02,
+    contact: 0.38, surface: "duvet", blur: 0, grain: 0.02, dof: { near: 1.2, far: 5.5 }, bgZoom: 0.5,
     credit: "Bedroom photo: Liz Vo (Unsplash)"
   }
 };
@@ -4190,13 +4190,10 @@ function updatePhotoPrintBgNote() {
   el.classList.toggle("error", isError);
 }
 
-// Crop/zoom for one photo at one output size and printer model. Zooms in
-// (up to 1.25x, never below cover) so the printer keeps a similar
-// on-screen size to the studio scene - printer and photo always scale
-// together, so their relative (real-world) size never changes. Then
-// crops so the resting point sits centred, low in the frame, backing the
-// zoom off if the finished print wouldn't fit above it.
-function ppPhotoLayout(spec, img, w, h, model, image) {
+// Real-scale crop/zoom (the previous composition): printer and photo
+// scale together at real-world size. Now only used as the reference size
+// that the photo-first framing below doubles (see ppHeroPW).
+function ppRealScaleLayout(spec, img, w, h, model, image) {
   const iw = img.width, ih = img.height;
   const cover = Math.max(w / iw, h / ih);
   const m = PP_MODELS[model];
@@ -4222,18 +4219,123 @@ function ppPhotoLayout(spec, img, w, h, model, image) {
   }
 }
 
+// --- Photo-first framing ---
+// The printed photograph is the subject: the "camera" moves in so the
+// print is ~2x the size it had at real-scale framing, and the printer
+// becomes the object it rises out of - same proportions, sitting low in
+// the frame, cropped by the bottom edge when the frame can't hold all of
+// it (as in a close-up product shot). Caps per format keep the print
+// fully in frame with breathing room and stop the printer filling the
+// width.
+const PP_HERO_CAPS = {
+  tall:   { ph: 0.40, pw: 0.72, PW: 0.90 },  // 9:16
+  square: { ph: 0.50, pw: 0.62, PW: 0.80 },  // 1:1
+  wide:   { ph: 0.60, pw: 0.56, PW: 0.64 }   // 16:9
+};
+function ppFrameShape(w, h) { return h > w * 1.2 ? "tall" : w > h * 1.2 ? "wide" : "square"; }
+
+function ppHeroPW(w, h, model, image, refPW) {
+  const m = PP_MODELS[model];
+  const [pwU, phU] = ppPaperSize(m, image);
+  const cap = PP_HERO_CAPS[ppFrameShape(w, h)];
+  return Math.min(refPW * 2, (cap.ph * h) / phU, (cap.pw * w) / pwU, cap.PW * w);
+}
+
+// Vertical placement: the whole printer + finished print centred in the
+// frame when it fits; otherwise the print keeps a fixed top margin and
+// the printer runs off the bottom edge.
+function ppHeroBase(h, PW, units) {
+  const total = units * PW;
+  const paperTop = Math.max(h * 0.055, (h - total) * 0.5);
+  return paperTop + total;
+}
+
+// Studio tabletop: no photo to anchor to, so just the photo-first size
+// and placement, centred.
+function ppStudioAnchor(w, h, model, image) {
+  const m = PP_MODELS[model];
+  const units = ppStackUnits(model, image, 1);
+  const refPW = Math.min(w * m.sizeFrac, (h * 0.64) / units);
+  const PW = ppHeroPW(w, h, model, image, refPW);
+  return { PW, base: ppHeroBase(h, PW, units), cx: w / 2, topScale: 1 };
+}
+
+// Photographic scenes: printer/print at the photo-first size, and the
+// photo cropped so the printer stands on the photographed surface (sand,
+// table, duvet). The camera is now much closer than at real scale; the
+// background, being further away, is magnified less than the printer
+// (zoom at most 1.6x the source pixels - it is out of focus anyway) and
+// receives depth-of-field blur in ppPhotoBackground.
+function ppPhotoLayout(spec, img, w, h, model, image) {
+  const ref = ppRealScaleLayout(spec, img, w, h, model, image);
+  const units = ppStackUnits(model, image, spec.topScale);
+  const PW = ppHeroPW(w, h, model, image, ref.anchor.PW);
+  const base = ppHeroBase(h, PW, units);
+  const iw = img.width, ih = img.height;
+  const cover = Math.max(w / iw, h / ih);
+  const realS = PW / (PP_MODEL_MM[model] * spec.pxPerMm);
+  const s = Math.max(cover, Math.min(Math.max(cover, 1.6), realS * spec.bgZoom));
+  const dw = iw * s, dh = ih * s;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  // The surface point goes under the printer's base, or to the bottom of
+  // the frame when the base is below it (the printer then stands on the
+  // nearer, out-of-frame part of the same surface).
+  const surfY = Math.min(base, h * 0.985);
+  const offX = Math.round(clamp(spec.surfaceX * dw - w / 2, 0, dw - w));
+  const offY = Math.round(clamp(spec.surfaceY * dh - surfY, 0, dh - h));
+  // Keep the print near the centre line: follow the surface point only
+  // within +/-12% of the width, and keep the printer inside the frame.
+  const sx = spec.surfaceX * dw - offX;
+  const half = PW / 2 + w * 0.03;
+  let cx = clamp(sx, w * 0.38, w * 0.62);
+  cx = half * 2 >= w ? w / 2 : clamp(cx, half, w - half);
+  return { s, dw, dh, offX, offY, focusY: spec.surfaceY * dh - offY, refPW: ref.anchor.PW,
+           anchor: { PW, base, cx, topScale: spec.topScale } };
+}
+
 // The cropped photo for one layout, cached - every preview and export
-// frame draws these exact pixels.
+// frame draws these exact pixels. Depth of field: the camera focuses on
+// the print, so the photo is softened everywhere - lightly around the
+// surface the printer stands on, more with distance behind it (towards
+// the top of the frame) and a little in the near foreground. Moderate
+// radii (scaled to the output size) keep the place recognisable.
 const ppPhotoBgCache = new Map();
-function ppPhotoBackground(name, img, w, h, L) {
-  const key = [name, w, h, L.s.toFixed(5), L.offX, L.offY].join("|");
+function ppPhotoBackground(name, img, w, h, L, dof) {
+  const key = [name, w, h, L.s.toFixed(5), L.offX, L.offY, Math.round(L.focusY)].join("|");
   let c = ppPhotoBgCache.get(key);
   if (c) return c;
+  const sharp = ppMakeCanvas(w, h);
+  const sx = sharp.getContext("2d");
+  sx.imageSmoothingEnabled = true;
+  sx.imageSmoothingQuality = "high";
+  sx.drawImage(img, -L.offX, -L.offY, L.dw, L.dh);
   c = ppMakeCanvas(w, h);
   const x = c.getContext("2d");
-  x.imageSmoothingEnabled = true;
-  x.imageSmoothingQuality = "high";
-  x.drawImage(img, -L.offX, -L.offY, L.dw, L.dh);
+  const sc = Math.min(w, h) / 1080;
+  const focusY = Math.min(L.focusY, h);
+  // Blurred copy, faded in through a vertical mask (fully blurred where
+  // the mask is opaque). Drawn over the sharp/softer layer beneath, so
+  // the frame edges never fade to transparent.
+  const layer = (blur, stops) => {
+    const t = ppMakeCanvas(w, h);
+    const tx = t.getContext("2d");
+    tx.filter = `blur(${(blur * sc).toFixed(2)}px)`;
+    tx.drawImage(sharp, 0, 0);
+    tx.filter = "none";
+    if (stops) {
+      tx.globalCompositeOperation = "destination-in";
+      const gr = tx.createLinearGradient(0, stops[0][0], 0, stops[stops.length - 1][0]);
+      const y0 = stops[0][0], span = Math.max(1, stops[stops.length - 1][0] - y0);
+      for (const [y, a] of stops) gr.addColorStop(ppClamp01((y - y0) / span), `rgba(0,0,0,${a})`);
+      tx.fillStyle = gr;
+      tx.fillRect(0, 0, w, h);
+    }
+    x.drawImage(t, 0, 0);
+  };
+  x.drawImage(sharp, 0, 0);
+  layer(dof.near, null);                                                  // whole frame, light
+  layer(dof.far, [[focusY - h * 0.55, 1], [focusY - h * 0.06, 0]]);       // distance behind
+  layer(dof.near * 2.2, [[focusY + h * 0.03, 0], [focusY + h * 0.25, 1]]); // near foreground
   if (ppPhotoBgCache.size >= 6) ppPhotoBgCache.delete(ppPhotoBgCache.keys().next().value);
   ppPhotoBgCache.set(key, c);
   return c;
@@ -4287,10 +4389,13 @@ function ppLightSubject(lc, g, spec, paperTop) {
   const top = Math.min(g.yT, paperTop), bottom = g.base + 2;
   lc.save();
   lc.globalCompositeOperation = "source-atop";
+  // Directional light: full strength on the printer, a quarter on the
+  // print (it faces the camera and must stay clean and readable).
+  const lit = (y0, y1) => { lc.fillRect(x0 - g.PW, y0, g.PW * 3, y1 - y0); };
   if (L.from === "back") {
     // Backlit under shade: the top catches the bright sky behind, the
     // front face stays in shadow.
-    const gr = lc.createLinearGradient(0, top, 0, bottom);
+    const gr = lc.createLinearGradient(0, g.yT, 0, bottom);
     gr.addColorStop(0, L.warm);
     gr.addColorStop(0.55, "rgba(0,0,0,0)");
     gr.addColorStop(1, L.cool);
@@ -4303,7 +4408,8 @@ function ppLightSubject(lc, g, spec, paperTop) {
     gr.addColorStop(1, L.cool);
     lc.fillStyle = gr;
   }
-  lc.fillRect(x0 - g.PW, top - 4, g.PW * 3, bottom - top + 8);
+  lit(g.yT - 2, bottom + 4);
+  if (paperTop < g.yT - 2) { lc.globalAlpha = 0.25; lit(top - 4, g.yT - 2); lc.globalAlpha = 1; }
   if (L.rim) {
     const rw = g.PW * 0.05;
     for (const [a, b] of [[x1, x1 - rw], [x0, x0 + rw]]) {
@@ -4311,7 +4417,7 @@ function ppLightSubject(lc, g, spec, paperTop) {
       rim.addColorStop(0, L.rim);
       rim.addColorStop(1, "rgba(255,255,255,0)");
       lc.fillStyle = rim;
-      lc.fillRect(Math.min(a, b), top, rw, bottom - top);
+      lc.fillRect(Math.min(a, b), g.yT, rw, bottom - g.yT);
     }
     const rimTop = lc.createLinearGradient(0, g.yT, 0, g.yT + g.topD * 0.6);
     rimTop.addColorStop(0, L.rim);
@@ -4319,6 +4425,15 @@ function ppLightSubject(lc, g, spec, paperTop) {
     lc.fillStyle = rimTop;
     lc.fillRect(x0, g.yT, g.PW, g.topD * 0.6);
   }
+  // Photo-first: the light (and the eye) is on the print. The printer's
+  // front face falls into gentle shade towards the surface, so it reads
+  // as the supporting object below the print. Starts at the front face -
+  // the paper (always above the slot) is never darkened.
+  const fall = lc.createLinearGradient(0, g.yF, 0, g.yF + Math.min(g.bodyH, g.PW * 0.55));
+  fall.addColorStop(0, "rgba(0,0,0,0)");
+  fall.addColorStop(1, "rgba(0,0,0,0.30)");
+  lc.fillStyle = fall;
+  lc.fillRect(x0 - 4, g.yF, g.PW + 8, g.base - g.yF + 2);
   lc.globalAlpha = spec.grain;
   lc.fillStyle = lc.createPattern(ppNoise(), "repeat");
   lc.fillRect(x0 - g.PW, top - 4, g.PW * 3, bottom - top + 8);
@@ -4337,6 +4452,7 @@ function ppCaptureSurface(c, g, spec) {
   const depth = g.PW * (sand ? 0.028 : 0.05);
   const x0 = Math.floor(g.cx - g.PW * 0.64), x1 = Math.ceil(g.cx + g.PW * 0.64);
   const y0 = Math.floor(g.base - depth * 1.8), y1 = Math.ceil(g.base + depth * 0.5);
+  if (y0 >= c.canvas.height) return null; // base below the frame edge
   const snap = ppMakeCanvas(x1 - x0, y1 - y0);
   snap.getContext("2d").drawImage(c.canvas, x0, y0, x1 - x0, y1 - y0, 0, 0, x1 - x0, y1 - y0);
   return { snap, x0, y0, depth, sand };
@@ -4372,6 +4488,7 @@ function ppEmbedInSurface(c, g, cap, scale) {
   c.drawImage(t, x0, y0);
 }
 
+let ppStudioBg = null;
 function drawPhotoPrintScene(p) {
   const w = canvas.width, h = canvas.height;
   const bgName = photoPrint.background;
@@ -4382,9 +4499,12 @@ function drawPhotoPrintScene(p) {
     drawPhotoPrintPhotoScene(p, bgName, photoSpec, pst);
     return;
   }
-  const g = photoPrintGeometry(w, h, photoPrint.image, photoPrint.printer);
-  const timing = photoPrintTiming(ppClamp01(p), photoPrint.speed);
   const sceneName = PP_SCENES[photoPrint.background] ? photoPrint.background : "studio";
+  // Studio gets the photo-first framing too; the illustrated scenes (only
+  // a fallback while a background photo loads, or on file://) keep theirs.
+  const anchor = sceneName === "studio" ? ppStudioAnchor(w, h, photoPrint.printer, photoPrint.image) : undefined;
+  const g = photoPrintGeometry(w, h, photoPrint.image, photoPrint.printer, anchor);
+  const timing = photoPrintTiming(ppClamp01(p), photoPrint.speed);
   const sc = PP_SCENES[sceneName];
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -4392,7 +4512,15 @@ function drawPhotoPrintScene(p) {
   ctx.filter = "none";
 
   if (sceneName === "studio") {
-    ppDrawBackground(ctx, g, w, h);
+    // The studio backdrop never changes during the animation - draw it
+    // once per layout (five full-frame gradients) and reuse the pixels.
+    const key = [w, h, g.yF, g.bodyH, g.cx, g.PW, g.yT].map(v => Math.round(v * 100)).join("|");
+    if (!ppStudioBg || ppStudioBg.key !== key) {
+      const bc = ppMakeCanvas(w, h);
+      ppDrawBackground(bc.getContext("2d"), g, w, h);
+      ppStudioBg = { key, canvas: bc };
+    }
+    ctx.drawImage(ppStudioBg.canvas, 0, 0);
     ppDrawContactShadow(ctx, g);
   } else {
     ctx.drawImage(ppGetSceneCanvas(sceneName, w, h, g), 0, 0);
@@ -4435,7 +4563,7 @@ function drawPhotoPrintPhotoScene(p, name, spec, pst) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
   ctx.filter = "none";
-  ctx.drawImage(ppPhotoBackground(name, pst.img, w, h, L), 0, 0);
+  ctx.drawImage(ppPhotoBackground(name, pst.img, w, h, L, spec.dof), 0, 0);
 
   const emergedPx = photoPrint.image ? timing.emerge * g.ph * PP_FINAL_OUT : 0;
   ppDrawCastShadow(ctx, g, { shadow: { ...spec.shadow, rgb: shadowRGB } }, emergedPx);
