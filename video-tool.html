@@ -888,8 +888,17 @@
     </div>
     <div class="photo-print-group-label">Printer appearance</div>
     <div class="output-mode-row">
-      <label><input type="radio" name="photoPrintPrinter" value="selphy" checked> SELPHY-inspired</label>
+      <label><input type="radio" name="photoPrintPrinter" value="instax" checked> Instax Link-inspired handheld</label>
+      <label><input type="radio" name="photoPrintPrinter" value="qx20"> SELPHY QX20-inspired compact</label>
       <label><input type="radio" name="photoPrintPrinter" value="generic"> Generic compact printer</label>
+      <label><input type="radio" name="photoPrintPrinter" value="selphy"> Classic desktop (SELPHY-inspired)</label>
+    </div>
+    <div class="photo-print-group-label">Background</div>
+    <div class="output-mode-row">
+      <label><input type="radio" name="photoPrintBackground" value="beach" checked> Thailand beach</label>
+      <label><input type="radio" name="photoPrintBackground" value="balcony"> Tropical balcony</label>
+      <label><input type="radio" name="photoPrintBackground" value="bedroom"> Bedroom</label>
+      <label><input type="radio" name="photoPrintBackground" value="studio"> Studio tabletop</label>
     </div>
     <div class="photo-print-group-label">Output format</div>
     <div class="output-mode-row">
@@ -1044,7 +1053,8 @@ const photoPrint = {
   speed: 1,             // 0.5-2
   scale: 1,             // 0.7-1.3
   border: true,
-  printer: "selphy",    // "selphy" | "generic"
+  printer: "instax",    // "instax" | "qx20" | "generic" | "selphy" (classic desktop)
+  background: "beach",  // "beach" | "balcony" | "bedroom" | "studio"
   format: "9:16",
   progress: 0,          // 0..1 - the single value preview and export both draw from
   baseProgress: 0,
@@ -2199,21 +2209,63 @@ function ppSmoothstep(x) { x = ppClamp01(x); return x * x * (3 - 2 * x); }
 // whole animation. The photo "develops" (fades/saturates in) alongside
 // the paper movement and always finishes by p = 0.98.
 const PP_IDLE = 0.1;
-function photoPrintTiming(p, speed) {
+// `duration` only feeds `t` (seconds into the animation), which drives the
+// indicator lights and the subtle mechanical vibration - both derived
+// from p, never from wall-clock time, so preview and export match.
+function photoPrintTiming(p, speed, duration = photoPrint.duration) {
   const printLen = Math.min(0.86, Math.max(0.25, 0.62 / speed));
   const raw = ppClamp01((p - PP_IDLE) / printLen);
-  const emerge = 0.5 - 0.5 * Math.cos(Math.PI * raw); // ease-in-out
+  // Stepped feed: the paper advances in gentle pulses like a real feed
+  // roller (speed varies +/-30%), but never stops or moves backwards -
+  // d/draw of this is 1 + 0.3cos(...) >= 0.7 - and both ends are exact.
+  const FEED_STEPS = 12;
+  const stepped = raw + 0.3 * Math.sin(2 * Math.PI * FEED_STEPS * raw) / (2 * Math.PI * FEED_STEPS);
+  const emerge = 0.5 - 0.5 * Math.cos(Math.PI * stepped); // ease-in-out
   const devStart = PP_IDLE + printLen * 0.05;
   const devLen = Math.min(printLen * 1.05, 0.98 - devStart);
   const develop = ppSmoothstep((p - devStart) / devLen);
-  return { raw, emerge, develop, printing: raw > 0 && raw < 1, done: raw >= 1 };
+  return { raw, emerge, develop, printing: raw > 0 && raw < 1, done: raw >= 1, t: p * duration };
 }
 
-// Paper follows the photo's orientation (portrait photo -> portrait
-// 100x148 postcard, landscape -> landscape), so a photo is never forced
-// into a badly cropped shape. Printer size is then fitted so the fully
-// printed paper plus printer fit the chosen output format.
+// Printer models. Sizes are in units of the printer's own width (PW):
+//   sizeFrac - target printer width as a fraction of the output width
+//              (kept small, ~25-36%; height-limited formats such as
+//              16:9 shrink it further so the printed paper still fits)
+//   faceH    - height of the front face, topD - visible depth of the top
+//   paper    - which media the model prints (see ppPaperSize)
+// The two brand-inspired models are deliberately the smallest. Their
+// designs are generic interpretations - no logos or product names drawn.
+const PP_MODELS = {
+  instax:  { sizeFrac: 0.25, faceH: 1.30, topD: 0.10, paper: "instax" },   // handheld, upright
+  qx20:    { sizeFrac: 0.29, faceH: 0.30, topD: 0.34, paper: "square" },   // flat compact
+  generic: { sizeFrac: 0.33, faceH: 0.40, topD: 0.13, paper: "postcard", paperRatio: 0.76 },
+  selphy:  { sizeFrac: 0.36, faceH: 0.36, topD: 0.12, paper: "postcard", paperRatio: 0.74 }
+};
+
+// Paper size in printer-width units.
+//   instax   - instant mini film, 54x86mm card from a ~92mm-wide printer
+//   square   - 68x68mm square sticker paper
+//   postcard - 100x148mm, following the photo's orientation (portrait
+//              photo -> portrait paper, landscape -> landscape)
+function ppPaperSize(m, image) {
+  if (m.paper === "instax") { const pw = 54 / 92; return [pw, pw * 86 / 54]; }
+  if (m.paper === "square") return [0.62, 0.62];
+  const landscape = image ? image.width > image.height : false;
+  const pa = landscape ? 100 / 148 : 148 / 100;
+  return [m.paperRatio, m.paperRatio * pa];
+}
+
 const PP_STYLES = {
+  instax: {
+    radius: 0.17,
+    faceTop: "#3a4a68", faceBottom: "#263149", cap: "#4d5f80", topBack: "#62759a", topFront: "#46587a",
+    edge: "rgba(255,255,255,0.28)", slot: "#07090d", trim: "#1d2536"
+  },
+  qx20: {
+    radius: 0.09,
+    faceTop: "#f4f2ee", faceBottom: "#d9d5ce", topBack: "#fbfaf8", topFront: "#ebe8e3",
+    edge: "rgba(255,255,255,0.95)", slot: "#151517", trim: "#c9c5be"
+  },
   selphy: {
     paperRatio: 0.74, bodyRatio: 0.36, topRatio: 0.12, radius: 0.07,
     faceTop: "#2e3035", faceBottom: "#141518", topBack: "#43464c", topFront: "#2c2e33",
@@ -2228,22 +2280,31 @@ const PP_STYLES = {
 const PP_FINAL_OUT = 0.965; // fraction of the paper that ends up outside the slot
 
 function photoPrintGeometry(w, h, image, style) {
-  const s = PP_STYLES[style] || PP_STYLES.selphy;
-  const landscape = image ? image.width > image.height : false;
-  const pa = landscape ? 100 / 148 : 148 / 100; // paper height / width
-  const PW = Math.min(w * 0.84, (h * 0.84) / (s.paperRatio * pa * PP_FINAL_OUT + s.bodyRatio + s.topRatio));
-  const pw = PW * s.paperRatio;
-  const ph = pw * pa;
-  const bodyH = PW * s.bodyRatio;
-  const topD = PW * s.topRatio;
-  const total = ph * PP_FINAL_OUT + topD * 0.55 + bodyH;
-  const paperTopFinal = (h - total) / 2 + h * 0.015;
+  const model = PP_MODELS[style] ? style : "instax";
+  const m = PP_MODELS[model];
+  const s = PP_STYLES[model];
+  const [pwU, phU] = ppPaperSize(m, image);
+  const units = phU * PP_FINAL_OUT + m.topD * 0.55 + m.faceH;
+  // Small in the scene: a fixed share of the width, unless the finished
+  // print would then take more than 64% of the frame height.
+  const PW = Math.min(w * m.sizeFrac, (h * 0.64) / units);
+  const pw = PW * pwU;
+  const ph = PW * phU;
+  const bodyH = PW * m.faceH;
+  const topD = PW * m.topD;
+  const total = units * PW;
+  // Rest the printer on a fixed line in the frame (lower third in 9:16,
+  // near the bottom in square/landscape) so every model sits naturally
+  // on its surface with the finished print above it, rather than
+  // floating mid-frame with a lot of empty foreground.
+  const baseTarget = h * (h > w * 1.2 ? 0.74 : 0.86);
+  const paperTopFinal = Math.max(h * 0.07, baseTarget - total);
   const slotY = paperTopFinal + ph * PP_FINAL_OUT;
   const yT = slotY - topD * 0.45;
   const yF = yT + topD;
   const base = yF + bodyH;
-  const slitH = Math.max(4, topD * 0.22);
-  return { cx: w / 2, PW, pw, ph, bodyH, topD, slotY, yT, yF, base, slitH, s, landscape };
+  const slitH = Math.max(3, Math.min(topD * 0.22, PW * 0.035));
+  return { cx: w / 2, PW, pw, ph, bodyH, topD, slotY, yT, yF, base, slitH, s, model, paperKind: m.paper };
 }
 
 function ppRoundRect(c, x, y, w, h, r) {
@@ -2411,8 +2472,17 @@ function ppDrawPaper(c, g, timing, image) {
 
   // Photo, moving with the paper
   if (image) {
-    const m = photoPrint.border ? g.pw * 0.05 : 0;
-    const ax = px + m, ay = py + m, aw = g.pw - m * 2, ah = g.ph - m * 2;
+    let ax, ay, aw, ah;
+    if (!photoPrint.border) {
+      ax = px; ay = py; aw = g.pw; ah = g.ph;
+    } else if (g.paperKind === "instax") {
+      // Instant mini film: 46x62mm image window in a 54x86mm card, with
+      // the classic wide bottom margin.
+      ax = px + g.pw * (4 / 54); ay = py + g.ph * (6.5 / 86); aw = g.pw * (46 / 54); ah = g.ph * (62 / 86);
+    } else {
+      const m = g.pw * (g.paperKind === "square" ? 0.06 : 0.05);
+      ax = px + m; ay = py + m; aw = g.pw - m * 2; ah = g.ph - m * 2;
+    }
     c.save();
     c.beginPath();
     c.rect(ax, ay, aw, ah);
@@ -2420,6 +2490,12 @@ function ppDrawPaper(c, g, timing, image) {
     const cover = Math.max(aw / image.width, ah / image.height) * photoPrint.scale;
     const dw = image.width * cover, dh = image.height * cover;
     const d = timing.develop;
+    if (g.paperKind === "instax") {
+      // Instant film comes out a dark olive and the image develops up
+      // through it.
+      c.fillStyle = `rgba(52,57,45,${(0.96 * (1 - d)).toFixed(3)})`;
+      c.fillRect(ax, ay, aw, ah);
+    }
     c.globalAlpha = 0.06 + 0.94 * d;
     c.filter = `saturate(${(0.2 + 0.8 * d).toFixed(3)}) contrast(${(0.82 + 0.18 * d).toFixed(3)}) brightness(${(1.14 - 0.14 * d).toFixed(3)})`;
     c.drawImage(image, ax + (aw - dw) / 2, ay + (ah - dh) / 2, dw, dh);
@@ -2592,43 +2668,1415 @@ function ppDrawGenericDetails(c, g, timing) {
   ppDrawLed(c, x + g.PW * 0.78, byc, br * 0.3, timing);
 }
 
-// Status LED: dim when idle, pulsing while printing, steady when done.
-// Pulse is derived from print progress (not wall-clock time), so it's
+// Status light state shared by every model: dim green when idle, amber
+// pulsing while printing, steady bright green once the print is done.
+// Derived from timing (p and p*duration), never wall-clock time, so it's
 // identical in preview and export.
-function ppDrawLed(c, x, y, r, timing) {
-  let a = 0.35;
-  if (timing.printing) a = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(timing.raw * Math.PI * 2 * 5));
-  else if (timing.done) a = 1;
-  const glow = c.createRadialGradient(x, y, 0, x, y, r * 4);
-  glow.addColorStop(0, `rgba(120,230,150,${0.45 * a})`);
-  glow.addColorStop(1, "rgba(120,230,150,0)");
+function ppStatusLight(timing) {
+  if (timing.printing) return { rgb: [255, 170, 60], a: 0.5 + 0.5 * (0.5 + 0.5 * Math.sin(timing.t * Math.PI * 2 * 1.6)) };
+  if (timing.done) return { rgb: [110, 235, 140], a: 1 };
+  return { rgb: [110, 235, 140], a: 0.32 };
+}
+
+function ppDrawGlowDot(c, x, y, r, rgb, a) {
+  const [R, G, B] = rgb;
+  const glow = c.createRadialGradient(x, y, 0, x, y, r * 4.5);
+  glow.addColorStop(0, `rgba(${R},${G},${B},${(0.5 * a).toFixed(3)})`);
+  glow.addColorStop(1, `rgba(${R},${G},${B},0)`);
   c.fillStyle = glow;
   c.beginPath();
-  c.arc(x, y, r * 4, 0, Math.PI * 2);
+  c.arc(x, y, r * 4.5, 0, Math.PI * 2);
   c.fill();
-  c.fillStyle = `rgba(150,245,175,${0.3 + 0.7 * a})`;
+  c.fillStyle = `rgba(${Math.min(255, R + 40)},${Math.min(255, G + 30)},${Math.min(255, B + 30)},${(0.3 + 0.7 * a).toFixed(3)})`;
   c.beginPath();
   c.arc(x, y, r, 0, Math.PI * 2);
   c.fill();
+}
+
+function ppDrawLed(c, x, y, r, timing) {
+  const st = ppStatusLight(timing);
+  ppDrawGlowDot(c, x, y, r, st.rgb, st.a);
+}
+
+// ---------------------------------------------------------------------
+// Shared helpers for the new models and scenes
+// ---------------------------------------------------------------------
+
+// Seeded PRNG (mulberry32): scenes and textures are random-looking but
+// identical every time, so a cached scene, the preview and the export
+// can never differ.
+function ppRng(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function ppMakeCanvas(w, h) {
+  const c = document.createElement("canvas");
+  c.width = Math.max(1, Math.ceil(w));
+  c.height = Math.max(1, Math.ceil(h));
+  return c;
+}
+
+let ppNoiseTile = null;
+function ppNoise() {
+  if (ppNoiseTile) return ppNoiseTile;
+  const n = 256;
+  ppNoiseTile = ppMakeCanvas(n, n);
+  const x = ppNoiseTile.getContext("2d");
+  const img = x.createImageData(n, n);
+  const r = ppRng(99);
+  for (let i = 0; i < n * n; i++) {
+    const v = Math.floor(r() * 256);
+    img.data[i * 4] = v; img.data[i * 4 + 1] = v; img.data[i * 4 + 2] = v; img.data[i * 4 + 3] = 255;
+  }
+  x.putImageData(img, 0, 0);
+  return ppNoiseTile;
+}
+
+// Fine material/film grain over whatever is currently clipped.
+function ppGrain(c, x, y, w, h, alpha) {
+  c.save();
+  c.globalAlpha = alpha;
+  c.globalCompositeOperation = "overlay";
+  c.fillStyle = c.createPattern(ppNoise(), "repeat");
+  c.fillRect(x, y, w, h);
+  c.restore();
+}
+
+// ---------------------------------------------------------------------
+// Instax Link-inspired handheld printer (upright, rounded, space blue)
+// ---------------------------------------------------------------------
+function ppDrawInstaxBack(c, g) {
+  const s = g.s, x0 = g.cx - g.PW / 2, x1 = g.cx + g.PW / 2;
+  const rx = g.PW * s.radius, ry = g.topD * 0.5;
+  c.beginPath();
+  c.moveTo(x0 + rx, g.yT);
+  c.lineTo(x1 - rx, g.yT);
+  c.ellipse(x1 - rx, g.yT + ry, rx, ry, 0, -Math.PI / 2, 0);
+  c.lineTo(x1, g.yF + 1);
+  c.lineTo(x0, g.yF + 1);
+  c.lineTo(x0, g.yT + ry);
+  c.ellipse(x0 + rx, g.yT + ry, rx, ry, 0, Math.PI, Math.PI * 1.5);
+  c.closePath();
+  const grad = c.createLinearGradient(0, g.yT, 0, g.yF);
+  grad.addColorStop(0, s.topBack);
+  grad.addColorStop(1, s.topFront);
+  c.fillStyle = grad;
+  c.fill();
+  // soft specular sheen across the rounded top
+  const sh = c.createLinearGradient(x0, 0, x1, 0);
+  sh.addColorStop(0, "rgba(255,255,255,0)");
+  sh.addColorStop(0.3, "rgba(255,255,255,0.10)");
+  sh.addColorStop(0.55, "rgba(255,255,255,0)");
+  c.fillStyle = sh;
+  c.fill();
+  c.strokeStyle = s.edge;
+  c.lineWidth = Math.max(1, g.PW * 0.004);
+  c.beginPath();
+  c.moveTo(x0 + rx, g.yT + 0.5);
+  c.lineTo(x1 - rx, g.yT + 0.5);
+  c.stroke();
+  ppDrawSlot(c, g);
+}
+
+function ppDrawInstaxFront(c, g) {
+  const s = g.s, x0 = g.cx - g.PW / 2, x1 = g.cx + g.PW / 2;
+  const r = g.PW * s.radius;
+  ppDrawSlotLip(c, g);
+  // Side power button (drawn first so the body edge overlaps its root)
+  ppRoundRect(c, x1 - g.PW * 0.01, g.yF + g.bodyH * 0.22, g.PW * 0.025, g.bodyH * 0.10, g.PW * 0.01);
+  c.fillStyle = s.trim;
+  c.fill();
+  // Body
+  c.save();
+  c.beginPath();
+  c.moveTo(x0, g.yF);
+  c.lineTo(x1, g.yF);
+  c.lineTo(x1, g.base - r);
+  c.quadraticCurveTo(x1, g.base, x1 - r, g.base);
+  c.lineTo(x0 + r, g.base);
+  c.quadraticCurveTo(x0, g.base, x0, g.base - r);
+  c.closePath();
+  const face = c.createLinearGradient(0, g.yF, 0, g.base);
+  face.addColorStop(0, s.faceTop);
+  face.addColorStop(1, s.faceBottom);
+  c.fillStyle = face;
+  c.fill();
+  c.clip();
+  // Lighter top cap with a seam, like a two-part shell
+  const capH = g.bodyH * 0.16;
+  const cap = c.createLinearGradient(0, g.yF, 0, g.yF + capH);
+  cap.addColorStop(0, s.cap);
+  cap.addColorStop(1, s.faceTop);
+  c.fillStyle = cap;
+  c.fillRect(x0, g.yF, g.PW, capH);
+  c.fillStyle = "rgba(0,0,0,0.35)";
+  c.fillRect(x0, g.yF + capH, g.PW, Math.max(1, g.PW * 0.006));
+  c.fillStyle = "rgba(255,255,255,0.10)";
+  c.fillRect(x0, g.yF + capH + Math.max(1, g.PW * 0.006), g.PW, Math.max(1, g.PW * 0.004));
+  // Rounded body: darker towards both sides, lighter centre-left
+  const sides = c.createLinearGradient(x0, 0, x1, 0);
+  sides.addColorStop(0, "rgba(0,0,0,0.30)");
+  sides.addColorStop(0.16, "rgba(255,255,255,0.06)");
+  sides.addColorStop(0.4, "rgba(255,255,255,0.03)");
+  sides.addColorStop(0.84, "rgba(0,0,0,0.04)");
+  sides.addColorStop(1, "rgba(0,0,0,0.38)");
+  c.fillStyle = sides;
+  c.fillRect(x0, g.yF, g.PW, g.bodyH);
+  // Ambient occlusion near the surface it rests on
+  const ao = c.createLinearGradient(0, g.base - g.bodyH * 0.18, 0, g.base);
+  ao.addColorStop(0, "rgba(0,0,0,0)");
+  ao.addColorStop(1, "rgba(0,0,0,0.30)");
+  c.fillStyle = ao;
+  c.fillRect(x0, g.base - g.bodyH * 0.18, g.PW, g.bodyH * 0.18);
+  ppGrain(c, x0, g.yF, g.PW, g.bodyH, 0.10); // matte soft-touch texture
+  c.restore();
+  // Recessed ring around the status light
+  const ringX = g.cx, ringY = g.yF + g.bodyH * 0.60, R = g.PW * 0.10;
+  const well = c.createRadialGradient(ringX, ringY - R * 0.3, R * 0.2, ringX, ringY, R * 1.35);
+  well.addColorStop(0, "rgba(0,0,0,0.12)");
+  well.addColorStop(0.8, "rgba(0,0,0,0.28)");
+  well.addColorStop(1, "rgba(255,255,255,0.08)");
+  c.fillStyle = well;
+  c.beginPath();
+  c.arc(ringX, ringY, R * 1.35, 0, Math.PI * 2);
+  c.fill();
+  // Bevel highlight on the top edge of the front face
+  c.strokeStyle = s.edge;
+  c.lineWidth = Math.max(1, g.PW * 0.004);
+  c.beginPath();
+  c.moveTo(x0 + 2, g.yF + 1);
+  c.lineTo(x1 - 2, g.yF + 1);
+  c.stroke();
+  // Rubber feet
+  c.fillStyle = "#15181f";
+  ppRoundRect(c, x0 + r * 0.7, g.base - 1, g.PW * 0.12, Math.max(2, g.PW * 0.012), g.PW * 0.006);
+  c.fill();
+  ppRoundRect(c, x1 - r * 0.7 - g.PW * 0.12, g.base - 1, g.PW * 0.12, Math.max(2, g.PW * 0.012), g.PW * 0.006);
+  c.fill();
+}
+
+// Ring of 12 light segments: idle = faint, printing = an amber light
+// chasing round the ring, done = the whole ring steady green.
+function ppDrawInstaxLights(c, g, timing) {
+  const ringX = g.cx, ringY = g.yF + g.bodyH * 0.60, R = g.PW * 0.10;
+  const st = ppStatusLight(timing);
+  const n = 12;
+  const lw = R * 0.24;
+  for (let i = 0; i < n; i++) {
+    const a0 = (i / n) * Math.PI * 2 - Math.PI / 2 + 0.06;
+    const a1 = a0 + (Math.PI * 2) / n - 0.12;
+    let level;
+    if (timing.printing) {
+      const phase = (i / n - timing.t * 0.9) % 1;
+      const d = (phase + 1) % 1;
+      level = 0.18 + 0.82 * Math.pow(Math.max(0, Math.cos(d * Math.PI * 2)), 6);
+    } else {
+      level = st.a;
+    }
+    const [R0, G0, B0] = st.rgb;
+    c.strokeStyle = "rgba(255,255,255,0.08)";
+    c.lineWidth = lw;
+    c.lineCap = "round";
+    c.beginPath();
+    c.arc(ringX, ringY, R, a0, a1);
+    c.stroke();
+    if (level > 0.05) {
+      c.save();
+      c.shadowColor = `rgba(${R0},${G0},${B0},${(0.9 * level).toFixed(3)})`;
+      c.shadowBlur = R * 0.6;
+      c.strokeStyle = `rgba(${R0},${G0},${B0},${level.toFixed(3)})`;
+      c.beginPath();
+      c.arc(ringX, ringY, R, a0, a1);
+      c.stroke();
+      c.restore();
+    }
+  }
+  c.lineCap = "butt";
+}
+
+// ---------------------------------------------------------------------
+// SELPHY QX20-inspired compact printer (flat, rounded, pearl white)
+// ---------------------------------------------------------------------
+function ppDrawQxBack(c, g) {
+  const s = g.s, x0 = g.cx - g.PW / 2, x1 = g.cx + g.PW / 2;
+  const inset = g.PW * 0.035;
+  const r = g.PW * 0.09;
+  // Top surface: rounded-square plan seen from above (narrower at back)
+  c.beginPath();
+  c.moveTo(x0 + inset + r, g.yT);
+  c.lineTo(x1 - inset - r, g.yT);
+  c.quadraticCurveTo(x1 - inset, g.yT, x1 - inset * 0.6, g.yT + r * 0.55);
+  c.lineTo(x1 - 1, g.yF - r * 0.25);
+  c.quadraticCurveTo(x1, g.yF, x1 - r * 0.3, g.yF + 1);
+  c.lineTo(x0 + r * 0.3, g.yF + 1);
+  c.quadraticCurveTo(x0, g.yF, x0 + 1, g.yF - r * 0.25);
+  c.lineTo(x0 + inset * 0.6, g.yT + r * 0.55);
+  c.quadraticCurveTo(x0 + inset, g.yT, x0 + inset + r, g.yT);
+  c.closePath();
+  const grad = c.createLinearGradient(0, g.yT, 0, g.yF);
+  grad.addColorStop(0, s.topBack);
+  grad.addColorStop(1, s.topFront);
+  c.fillStyle = grad;
+  c.fill();
+  c.save();
+  c.clip();
+  // Glossy pearl highlight towards the back-left
+  const hl = c.createRadialGradient(x0 + g.PW * 0.3, g.yT + g.topD * 0.35, 0, x0 + g.PW * 0.3, g.yT + g.topD * 0.35, g.PW * 0.55);
+  hl.addColorStop(0, "rgba(255,255,255,0.65)");
+  hl.addColorStop(1, "rgba(255,255,255,0)");
+  c.fillStyle = hl;
+  c.fillRect(x0, g.yT, g.PW, g.topD);
+  const side = c.createLinearGradient(x0, 0, x1, 0);
+  side.addColorStop(0, "rgba(0,0,0,0.06)");
+  side.addColorStop(0.2, "rgba(0,0,0,0)");
+  side.addColorStop(0.85, "rgba(0,0,0,0)");
+  side.addColorStop(1, "rgba(0,0,0,0.09)");
+  c.fillStyle = side;
+  c.fillRect(x0, g.yT, g.PW, g.topD);
+  ppGrain(c, x0, g.yT, g.PW, g.topD, 0.05);
+  c.restore();
+  // Flush power button towards the front-right of the top
+  const bx = x1 - g.PW * 0.15, by = g.yT + g.topD * 0.74;
+  const brx = g.PW * 0.038, bry = brx * 0.42;
+  c.fillStyle = "rgba(0,0,0,0.12)";
+  c.beginPath();
+  c.ellipse(bx, by + bry * 0.25, brx * 1.12, bry * 1.2, 0, 0, Math.PI * 2);
+  c.fill();
+  const bg = c.createLinearGradient(0, by - bry, 0, by + bry);
+  bg.addColorStop(0, "#ffffff");
+  bg.addColorStop(1, "#e2ded8");
+  c.fillStyle = bg;
+  c.beginPath();
+  c.ellipse(bx, by, brx, bry, 0, 0, Math.PI * 2);
+  c.fill();
+  // Fine seam where the paper-tray lid meets the body
+  c.strokeStyle = "rgba(0,0,0,0.10)";
+  c.lineWidth = Math.max(1, g.PW * 0.003);
+  c.beginPath();
+  c.moveTo(x0 + g.PW * 0.10, g.yT + g.topD * 0.56);
+  c.lineTo(x1 - g.PW * 0.28, g.yT + g.topD * 0.56);
+  c.stroke();
+  ppDrawSlot(c, g);
+}
+
+function ppDrawQxFront(c, g) {
+  const s = g.s, x0 = g.cx - g.PW / 2, x1 = g.cx + g.PW / 2;
+  const r = g.PW * s.radius;
+  ppDrawSlotLip(c, g);
+  c.save();
+  c.beginPath();
+  c.moveTo(x0 + r * 0.3, g.yF);
+  c.lineTo(x1 - r * 0.3, g.yF);
+  c.quadraticCurveTo(x1, g.yF, x1, g.yF + r * 0.3);
+  c.lineTo(x1, g.base - r);
+  c.quadraticCurveTo(x1, g.base, x1 - r, g.base);
+  c.lineTo(x0 + r, g.base);
+  c.quadraticCurveTo(x0, g.base, x0, g.base - r);
+  c.lineTo(x0, g.yF + r * 0.3);
+  c.quadraticCurveTo(x0, g.yF, x0 + r * 0.3, g.yF);
+  c.closePath();
+  const face = c.createLinearGradient(0, g.yF, 0, g.base);
+  face.addColorStop(0, s.faceTop);
+  face.addColorStop(1, s.faceBottom);
+  c.fillStyle = face;
+  c.fill();
+  c.clip();
+  const sides = c.createLinearGradient(x0, 0, x1, 0);
+  sides.addColorStop(0, "rgba(0,0,0,0.16)");
+  sides.addColorStop(0.12, "rgba(0,0,0,0)");
+  sides.addColorStop(0.88, "rgba(0,0,0,0)");
+  sides.addColorStop(1, "rgba(0,0,0,0.20)");
+  c.fillStyle = sides;
+  c.fillRect(x0, g.yF, g.PW, g.bodyH);
+  // Grey rubberised base band
+  const bandH = g.bodyH * 0.16;
+  c.fillStyle = "#6f6d6a";
+  c.fillRect(x0, g.base - bandH, g.PW, bandH);
+  c.fillStyle = "rgba(255,255,255,0.18)";
+  c.fillRect(x0, g.base - bandH, g.PW, Math.max(1, g.PW * 0.003));
+  ppGrain(c, x0, g.yF, g.PW, g.bodyH, 0.05);
+  c.restore();
+  // Status light window, front centre
+  ppRoundRect(c, g.cx - g.PW * 0.06, g.yF + g.bodyH * 0.40, g.PW * 0.12, Math.max(2, g.bodyH * 0.09), g.bodyH * 0.045);
+  c.fillStyle = "rgba(0,0,0,0.20)";
+  c.fill();
+  c.strokeStyle = s.edge;
+  c.lineWidth = Math.max(1, g.PW * 0.003);
+  c.beginPath();
+  c.moveTo(x0 + r * 0.3, g.yF + 1);
+  c.lineTo(x1 - r * 0.3, g.yF + 1);
+  c.stroke();
+}
+
+function ppDrawQxLights(c, g, timing) {
+  const st = ppStatusLight(timing);
+  const x1 = g.cx + g.PW / 2;
+  // Small LED beside the power button
+  ppDrawGlowDot(c, x1 - g.PW * 0.26, g.yT + g.topD * 0.74, g.PW * 0.009, st.rgb, st.a);
+  // Front light bar
+  const bw = g.PW * 0.12, bh = Math.max(2, g.bodyH * 0.09);
+  const bx = g.cx - bw / 2, by = g.yF + g.bodyH * 0.40;
+  const [R, G, B] = st.rgb;
+  c.save();
+  c.shadowColor = `rgba(${R},${G},${B},${(0.8 * st.a).toFixed(3)})`;
+  c.shadowBlur = g.PW * 0.03;
+  ppRoundRect(c, bx, by, bw, bh, bh / 2);
+  c.fillStyle = `rgba(${R},${G},${B},${(0.25 + 0.75 * st.a).toFixed(3)})`;
+  c.fill();
+  c.restore();
+}
+
+// ---------------------------------------------------------------------
+// Model dispatch: back = everything behind the paper (top surface, slot),
+// front = everything in front of it (slot lip, front face, details),
+// lights = animated indicators on top of all of that.
+// ---------------------------------------------------------------------
+function ppDrawPrinterBack(c, g) {
+  if (g.model === "instax") return ppDrawInstaxBack(c, g);
+  if (g.model === "qx20") return ppDrawQxBack(c, g);
+  ppDrawTopSurface(c, g);
+  ppDrawSlot(c, g);
+}
+function ppDrawPrinterFront(c, g, timing) {
+  if (g.model === "instax") return ppDrawInstaxFront(c, g);
+  if (g.model === "qx20") return ppDrawQxFront(c, g);
+  ppDrawSlotLip(c, g);
+  ppDrawFrontFace(c, g);
+  if (g.model === "generic") ppDrawGenericDetails(c, g, timing);
+  else ppDrawSelphyDetails(c, g, timing);
+}
+function ppDrawPrinterLights(c, g, timing) {
+  if (g.model === "instax") ppDrawInstaxLights(c, g, timing);
+  else if (g.model === "qx20") ppDrawQxLights(c, g, timing);
+  // generic / classic draw their (state-aware) LED inside their details
+}
+
+// Device silhouette (top surface + front face), traced to each model's
+// real outline so the scene-lighting overlay never spills onto the
+// background around the printer.
+function ppPrinterSilhouette(c, g) {
+  const x0 = g.cx - g.PW / 2, x1 = g.cx + g.PW / 2;
+  const r = g.PW * g.s.radius;
+  c.beginPath();
+  if (g.model === "instax") {
+    const rx = r, ry = g.topD * 0.5;
+    c.moveTo(x0 + rx, g.yT);
+    c.lineTo(x1 - rx, g.yT);
+    c.ellipse(x1 - rx, g.yT + ry, rx, ry, 0, -Math.PI / 2, 0);
+    c.lineTo(x1, g.base - r);
+    c.quadraticCurveTo(x1, g.base, x1 - r, g.base);
+    c.lineTo(x0 + r, g.base);
+    c.quadraticCurveTo(x0, g.base, x0, g.base - r);
+    c.lineTo(x0, g.yT + ry);
+    c.ellipse(x0 + rx, g.yT + ry, rx, ry, 0, Math.PI, Math.PI * 1.5);
+    c.closePath();
+    return;
+  }
+  const inset = g.PW * (g.model === "qx20" ? 0.05 : 0.03);
+  c.moveTo(x0 + inset, g.yT + 1);
+  c.lineTo(x1 - inset, g.yT + 1);
+  c.lineTo(x1 - 1, g.yF);
+  c.lineTo(x1 - 1, g.base - r);
+  c.quadraticCurveTo(x1 - 1, g.base - 1, x1 - r, g.base - 1);
+  c.lineTo(x0 + r, g.base - 1);
+  c.quadraticCurveTo(x0 + 1, g.base - 1, x0 + 1, g.base - r);
+  c.lineTo(x0 + 1, g.yF);
+  c.closePath();
+}
+
+// ---------------------------------------------------------------------
+// Background scenes
+// ---------------------------------------------------------------------
+// Each scene is rendered once per (scene, output size, printer layout)
+// into an offscreen canvas and cached - every preview frame and every
+// exported frame then draws the exact same pixels. Far layers get more
+// blur than near ones and a final depth-of-field pass keeps the
+// printer's resting plane sharp, for a photographic, moderate DoF look.
+const PP_SCENES = {
+  studio: {
+    shadow: null, contact: 0.45, tint: null
+  },
+  beach: {
+    // Late-afternoon sun behind-right: shadow falls towards the viewer, left
+    shadow: { dx: -0.42, dy: 0.17, alpha: 0.40, blur: 0.022, rgb: "70,48,24" },
+    contact: 0.5,
+    tint: { warm: "rgba(255,200,140,0.75)", cool: "rgba(40,70,110,0.55)", lightFromRight: true, rim: "rgba(255,236,200,0.55)" },
+    render: ppRenderBeach
+  },
+  balcony: {
+    shadow: { dx: 0.6, dy: -0.07, alpha: 0.36, blur: 0.03, rgb: "45,24,10" },
+    contact: 0.55,
+    tint: { warm: "rgba(255,210,160,0.6)", cool: "rgba(30,40,60,0.45)", lightFromRight: false, rim: null },
+    render: ppRenderBalcony
+  },
+  bedroom: {
+    shadow: { dx: 0.45, dy: -0.05, alpha: 0.20, blur: 0.07, rgb: "80,66,58" },
+    contact: 0.32,
+    tint: { warm: "rgba(255,236,210,0.5)", cool: "rgba(50,55,75,0.35)", lightFromRight: false, rim: null },
+    soft: true,
+    render: ppRenderBedroom
+  }
+};
+
+const ppSceneCache = new Map();
+function ppGetSceneCanvas(name, w, h, g) {
+  const key = [name, w, h, Math.round(g.base), Math.round(g.PW), Math.round(g.yT)].join("|");
+  const hit = ppSceneCache.get(key);
+  if (hit) return hit;
+  const c = ppMakeCanvas(w, h);
+  const x = c.getContext("2d");
+  PP_SCENES[name].render(x, w, h, g);
+  if (ppSceneCache.size >= 8) ppSceneCache.delete(ppSceneCache.keys().next().value);
+  ppSceneCache.set(key, c);
+  return c;
+}
+
+// Layers are drawn with padding so blurring them doesn't pull
+// transparent edges in from the canvas border.
+function ppLayer(w, h, pad) {
+  const c = ppMakeCanvas(w + pad * 2, h + pad * 2);
+  const x = c.getContext("2d");
+  x.translate(pad, pad);
+  return { c, x, pad };
+}
+function ppDrawLayer(dst, layer, blur) {
+  dst.save();
+  if (blur > 0.25) dst.filter = `blur(${blur.toFixed(2)}px)`;
+  dst.drawImage(layer.c, -layer.pad, -layer.pad);
+  dst.restore();
+}
+
+// Depth of field: blurred copies of the finished scene faded in above
+// (background) and below (foreground) the printer's resting plane.
+function ppDepthOfField(c, w, h, focusY, band, farBlur, nearBlur) {
+  const src = ppMakeCanvas(w, h);
+  src.getContext("2d").drawImage(c.canvas, 0, 0);
+  const apply = (blur, yFull, ySharp) => {
+    if (blur <= 0.25) return;
+    const tmp = ppMakeCanvas(w, h);
+    const t = tmp.getContext("2d");
+    t.filter = `blur(${blur.toFixed(2)}px)`;
+    t.drawImage(src, 0, 0);
+    t.filter = "none";
+    t.globalCompositeOperation = "destination-in";
+    const gr = t.createLinearGradient(0, yFull, 0, ySharp);
+    gr.addColorStop(0, "rgba(0,0,0,1)");
+    gr.addColorStop(1, "rgba(0,0,0,0)");
+    t.fillStyle = gr;
+    t.fillRect(0, 0, w, h);
+    c.drawImage(tmp, 0, 0);
+  };
+  apply(farBlur, focusY - band * 3, focusY - band);
+  apply(nearBlur, h, focusY + band * 1.2);
+}
+
+function ppFinishScene(c, w, h, warmth) {
+  // Gentle colour grade, vignette and grain - same for every scene
+  c.save();
+  c.globalCompositeOperation = "soft-light";
+  c.fillStyle = warmth;
+  c.fillRect(0, 0, w, h);
+  c.restore();
+  const vig = c.createRadialGradient(w / 2, h * 0.55, Math.min(w, h) * 0.4, w / 2, h * 0.55, Math.hypot(w, h) * 0.62);
+  vig.addColorStop(0, "rgba(0,0,0,0)");
+  vig.addColorStop(1, "rgba(0,0,0,0.26)");
+  c.fillStyle = vig;
+  c.fillRect(0, 0, w, h);
+  ppGrain(c, 0, 0, w, h, 0.05);
+}
+
+// Clouds are built from many small, faint puffs (a dense core thinning
+// out to ragged edges) on their own layer, then softened - so they read
+// as vapour rather than as a few cartoon blobs. Thin streaks of haze
+// near the horizon add distance.
+function ppDrawClouds(x, w, horizon, s, rnd, count) {
+  const layer = ppLayer(w, horizon, Math.ceil(30 * s));
+  const lx = layer.x;
+  for (let i = 0; i < count; i++) {
+    const cy = horizon * (0.10 + rnd() * 0.62);
+    const depth = cy / horizon;                      // 0 overhead .. 1 at horizon
+    const size = (170 - 110 * depth) * s * (0.6 + rnd() * 0.8);
+    const flat = 0.35 + 0.25 * (1 - depth);           // further clouds look flatter
+    const cx = rnd() * w;
+    const puffs = 50 + Math.floor(rnd() * 40);
+    for (let k = 0; k < puffs; k++) {
+      const u = (rnd() + rnd() + rnd()) / 3 - 0.5;    // denser in the middle
+      const px = cx + u * size * 3.2;
+      const top = Math.max(0, 1 - Math.abs(u) * 2.2);
+      const py = cy - rnd() * size * flat * (0.4 + top);
+      const r = size * (0.10 + rnd() * 0.22) * (0.6 + top * 0.6);
+      const lit = py < cy - size * flat * 0.3;
+      const gr = lx.createRadialGradient(px - r * 0.2, py - r * 0.3, 0, px, py, r);
+      gr.addColorStop(0, lit ? "rgba(255,255,255,0.55)" : "rgba(238,243,249,0.45)");
+      gr.addColorStop(1, "rgba(235,242,250,0)");
+      lx.fillStyle = gr;
+      lx.beginPath();
+      lx.arc(px, py, r, 0, Math.PI * 2);
+      lx.fill();
+    }
+    // Shaded, flatter base
+    const ug = lx.createRadialGradient(cx, cy, 0, cx, cy, size * 1.5);
+    ug.addColorStop(0, "rgba(160,176,198,0.16)");
+    ug.addColorStop(1, "rgba(160,176,198,0)");
+    lx.save();
+    lx.translate(cx, cy);
+    lx.scale(1, 0.18);
+    lx.translate(-cx, -cy);
+    lx.fillStyle = ug;
+    lx.beginPath();
+    lx.arc(cx, cy, size * 1.5, 0, Math.PI * 2);
+    lx.fill();
+    lx.restore();
+  }
+  // Wispy horizontal haze streaks low in the sky
+  for (let i = 0; i < 14; i++) {
+    const y = horizon * (0.55 + rnd() * 0.42);
+    const cx = rnd() * w, len = (200 + rnd() * 500) * s;
+    const gr = lx.createRadialGradient(cx, y, 0, cx, y, len);
+    gr.addColorStop(0, "rgba(255,255,255,0.22)");
+    gr.addColorStop(1, "rgba(255,255,255,0)");
+    lx.save();
+    lx.translate(cx, y);
+    lx.scale(1, 0.035);
+    lx.translate(-cx, -y);
+    lx.fillStyle = gr;
+    lx.beginPath();
+    lx.arc(cx, y, len, 0, Math.PI * 2);
+    lx.fill();
+    lx.restore();
+  }
+  ppDrawLayer(x, layer, 3.5 * s);
+}
+
+function ppDrawLongtail(x, cx, cy, L) {
+  x.save();
+  x.fillStyle = "rgba(10,40,55,0.25)";
+  x.fillRect(cx - L * 0.45, cy + L * 0.045, L * 0.95, L * 0.03);
+  x.fillStyle = "#4a2f1d";
+  x.beginPath();
+  x.moveTo(cx - L * 0.5, cy - L * 0.04);
+  x.quadraticCurveTo(cx - L * 0.1, cy + L * 0.07, cx + L * 0.4, cy + L * 0.02);
+  x.quadraticCurveTo(cx + L * 0.52, cy - L * 0.02, cx + L * 0.58, cy - L * 0.17);
+  x.lineTo(cx + L * 0.52, cy - L * 0.05);
+  x.quadraticCurveTo(cx, cy - L * 0.02, cx - L * 0.5, cy - L * 0.06);
+  x.closePath();
+  x.fill();
+  x.fillStyle = "#d8463c";
+  x.fillRect(cx + L * 0.545, cy - L * 0.17, L * 0.03, L * 0.05);
+  x.fillStyle = "#e9c440";
+  x.fillRect(cx + L * 0.55, cy - L * 0.135, L * 0.03, L * 0.04);
+  x.fillStyle = "#2f5f7a";
+  x.fillRect(cx - L * 0.25, cy - L * 0.17, L * 0.45, L * 0.035);
+  x.fillStyle = "#3b2a1d";
+  x.fillRect(cx - L * 0.22, cy - L * 0.14, L * 0.012, L * 0.1);
+  x.fillRect(cx + L * 0.17, cy - L * 0.14, L * 0.012, L * 0.1);
+  x.strokeStyle = "#2a2a2a";
+  x.lineWidth = Math.max(1, L * 0.012);
+  x.beginPath();
+  x.moveTo(cx - L * 0.45, cy - L * 0.08);
+  x.lineTo(cx - L * 0.78, cy + L * 0.03);
+  x.stroke();
+  x.restore();
+}
+
+// --- Thailand beach: printer on sand, shoreline, turquoise sea, limestone
+// karst islands and a longtail boat on the horizon.
+function ppRenderBeach(c, w, h, g) {
+  const s = Math.min(w, h) / 1080;
+  const rnd = ppRng(20241);
+  const pad = Math.ceil(40 * s);
+  const horizon = Math.round(Math.max(h * 0.2, Math.min(h * 0.43, g.yT - g.PW * 0.25)));
+  const shore = horizon + (g.base - horizon) * 0.42;
+  const wetEnd = shore + (g.base - shore) * 0.30;
+
+  // Sky + sun haze + clouds
+  const sky = ppLayer(w, horizon, pad);
+  {
+    const x = sky.x;
+    const gr = x.createLinearGradient(0, 0, 0, horizon);
+    gr.addColorStop(0, "#3a80c2");
+    gr.addColorStop(0.55, "#86bde3");
+    gr.addColorStop(1, "#dcedf0");
+    x.fillStyle = gr;
+    x.fillRect(-pad, -pad, w + pad * 2, horizon + pad * 2);
+    const sunX = w * 0.84, sunY = horizon * 0.28;
+    const sun = x.createRadialGradient(sunX, sunY, 0, sunX, sunY, Math.max(w, h) * 0.55);
+    sun.addColorStop(0, "rgba(255,250,232,0.9)");
+    sun.addColorStop(0.07, "rgba(255,244,214,0.55)");
+    sun.addColorStop(0.4, "rgba(255,236,200,0.12)");
+    sun.addColorStop(1, "rgba(255,236,200,0)");
+    x.fillStyle = sun;
+    x.fillRect(-pad, -pad, w + pad * 2, horizon + pad * 2);
+    ppDrawClouds(x, w, horizon, s, rnd, 9);
+  }
+  ppDrawLayer(c, sky, 3 * s);
+
+  // Limestone karst islands on the horizon, hazy with distance
+  const isl = ppLayer(w, horizon + 4, pad);
+  {
+    const x = isl.x;
+    const specs = [[-0.04, 0.34, 0.11], [0.50, 0.20, 0.08], [0.74, 0.12, 0.055], [0.30, 0.09, 0.035]];
+    for (const [sx, sw, sh] of specs) {
+      const x0 = w * sx, ww = w * sw, hh = h * sh * (h > w ? 0.72 : 1);
+      const bumps = 2 + Math.floor(rnd() * 3);
+      const bs = [];
+      for (let b = 0; b < bumps; b++) bs.push({ c: 0.15 + rnd() * 0.7, w: 0.14 + rnd() * 0.22, h: 0.55 + rnd() * 0.45 });
+      x.beginPath();
+      x.moveTo(x0, horizon + 3);
+      const n = 70;
+      for (let i = 0; i <= n; i++) {
+        const u = i / n;
+        let v = 0;
+        for (const b of bs) {
+          const d = (u - b.c) / b.w;
+          if (Math.abs(d) < 1) v = Math.max(v, b.h * Math.pow(1 - d * d, 0.32));
+        }
+        v *= Math.pow(Math.sin(Math.PI * u), 0.22) * (0.94 + 0.06 * Math.sin(u * 53 + sx * 17));
+        x.lineTo(x0 + u * ww, horizon - v * hh);
+      }
+      x.lineTo(x0 + ww, horizon + 3);
+      x.closePath();
+      const gr = x.createLinearGradient(0, horizon - hh, 0, horizon);
+      gr.addColorStop(0, "#58796a");
+      gr.addColorStop(0.55, "#6f8f88");
+      gr.addColorStop(1, "#93b3b8");
+      x.fillStyle = gr;
+      x.fill();
+      x.save();
+      x.clip();
+      for (let k = 0; k < 140; k++) {
+        x.fillStyle = rnd() < 0.5 ? "rgba(35,50,45,0.12)" : "rgba(225,228,215,0.10)";
+        x.fillRect(x0 + rnd() * ww, horizon - hh * rnd(), (1 + rnd() * 3) * s, hh * (0.2 + rnd() * 0.6));
+      }
+      x.restore();
+    }
+    x.globalCompositeOperation = "source-atop";
+    const hz = x.createLinearGradient(0, horizon - h * 0.12, 0, horizon);
+    hz.addColorStop(0, "rgba(185,212,226,0.25)");
+    hz.addColorStop(1, "rgba(210,232,240,0.65)");
+    x.fillStyle = hz;
+    x.fillRect(-pad, horizon - h * 0.14, w + pad * 2, h * 0.14 + 4);
+    x.globalCompositeOperation = "source-over";
+  }
+  ppDrawLayer(c, isl, 2.2 * s);
+
+  // Sea: deep blue at the horizon to shallow turquoise at the shore
+  const sea = ppLayer(w, h, pad);
+  {
+    const x = sea.x;
+    const gr = x.createLinearGradient(0, horizon, 0, shore);
+    gr.addColorStop(0, "#2a6f99");
+    gr.addColorStop(0.22, "#278fae");
+    gr.addColorStop(0.7, "#32b4bb");
+    gr.addColorStop(1, "#86dccd");
+    x.fillStyle = gr;
+    x.fillRect(-pad, horizon, w + pad * 2, shore - horizon + 6 * s);
+    const N = Math.round(1000 * (w / 1080));
+    for (let i = 0; i < N; i++) {
+      const f = Math.pow(rnd(), 1.4);
+      const y = horizon + (shore - horizon) * f;
+      const len = (6 + 90 * f) * s * (0.4 + rnd());
+      const xx = rnd() * w;
+      const th = Math.max(0.6, (0.5 + 2.5 * f) * s);
+      const nearSun = Math.abs(xx - w * 0.84) < w * 0.12 * (0.5 + f) && f < 0.75;
+      x.fillStyle = rnd() < 0.55
+        ? `rgba(255,255,255,${((nearSun ? 0.35 : 0.06) + rnd() * 0.12).toFixed(3)})`
+        : `rgba(10,55,80,${(0.06 + rnd() * 0.08).toFixed(3)})`;
+      x.fillRect(xx, y, len, th);
+    }
+    ppDrawLongtail(x, w * 0.22, horizon + (shore - horizon) * 0.2, w * 0.075);
+  }
+  ppDrawLayer(c, sea, 1.4 * s);
+
+  // Sand, wet shoreline, foam, ripples and grain
+  const ground = ppLayer(w, h, pad);
+  {
+    const x = ground.x;
+    const sg = x.createLinearGradient(0, shore, 0, h);
+    sg.addColorStop(0, "#d6c09c");
+    sg.addColorStop(0.3, "#e6d3b2");
+    sg.addColorStop(1, "#d7bd95");
+    x.fillStyle = sg;
+    x.fillRect(-pad, shore - 2 * s, w + pad * 2, h - shore + pad + 2 * s);
+    const wg = x.createLinearGradient(0, shore, 0, wetEnd);
+    wg.addColorStop(0, "rgba(140,118,88,0.95)");
+    wg.addColorStop(0.5, "rgba(170,146,110,0.6)");
+    wg.addColorStop(1, "rgba(200,176,140,0)");
+    x.fillStyle = wg;
+    x.fillRect(-pad, shore, w + pad * 2, wetEnd - shore);
+    // Sky reflected in the wet sand
+    const rg = x.createLinearGradient(0, shore, 0, shore + (wetEnd - shore) * 0.6);
+    rg.addColorStop(0, "rgba(190,220,235,0.35)");
+    rg.addColorStop(1, "rgba(190,220,235,0)");
+    x.fillStyle = rg;
+    x.fillRect(-pad, shore, w + pad * 2, wetEnd - shore);
+    const edge = xx => shore + (10 + 8 * Math.sin(xx / (140 * s)) + 5 * Math.sin(xx / (53 * s) + 1)) * s;
+    // Thin sheet of receding water
+    x.beginPath();
+    x.moveTo(-pad, shore - 3 * s);
+    for (let xx = -pad; xx <= w + pad; xx += 6 * s) x.lineTo(xx, edge(xx));
+    x.lineTo(w + pad, shore - 3 * s);
+    x.closePath();
+    x.fillStyle = "rgba(150,215,212,0.5)";
+    x.fill();
+    // Foam lace
+    for (let j = 0; j < 4; j++) {
+      x.beginPath();
+      for (let xx = -pad; xx <= w + pad; xx += 5 * s) {
+        const yy = edge(xx) - j * 3.5 * s + Math.sin(xx / (21 * s) + j * 2) * 1.5 * s;
+        if (xx === -pad) x.moveTo(xx, yy); else x.lineTo(xx, yy);
+      }
+      x.strokeStyle = `rgba(255,255,255,${(0.8 - j * 0.17).toFixed(2)})`;
+      x.lineWidth = Math.max(1, (3.2 - j * 0.6) * s);
+      x.stroke();
+    }
+    // Wind ripples in the dry sand
+    for (let i = 0; i < 80; i++) {
+      const f = rnd();
+      const y0 = wetEnd + (h - wetEnd) * Math.pow(f, 1.2);
+      const amp = (2 + 8 * f) * s, wl = (60 + 220 * f) * s, ph0 = rnd() * 10;
+      const lw = (2 + 10 * f) * s;
+      x.beginPath();
+      for (let xx = -pad; xx <= w + pad; xx += 8 * s) {
+        const yy = y0 + Math.sin(xx / wl + ph0) * amp + Math.sin(xx / (wl * 0.37) + ph0 * 2) * amp * 0.4;
+        if (xx === -pad) x.moveTo(xx, yy); else x.lineTo(xx, yy);
+      }
+      x.strokeStyle = `rgba(120,90,55,${(0.05 + 0.05 * rnd()).toFixed(3)})`;
+      x.lineWidth = lw;
+      x.stroke();
+      x.save();
+      x.translate(0, -lw * 0.6);
+      x.strokeStyle = `rgba(255,248,232,${(0.06 + 0.06 * rnd()).toFixed(3)})`;
+      x.lineWidth = lw * 0.6;
+      x.stroke();
+      x.restore();
+    }
+    // Individual grains
+    const M = Math.round(16000 * (w * h) / (1080 * 1920));
+    for (let i = 0; i < M; i++) {
+      const f = rnd();
+      const y = shore + (h - shore) * f;
+      const r = (0.5 + 1.6 * f * rnd()) * s;
+      const tone = rnd();
+      x.fillStyle = tone < 0.4 ? `rgba(120,95,65,${(0.25 + rnd() * 0.3).toFixed(3)})`
+        : tone < 0.8 ? `rgba(255,250,240,${(0.3 + rnd() * 0.4).toFixed(3)})`
+        : `rgba(70,60,55,${(0.2 + rnd() * 0.3).toFixed(3)})`;
+      x.fillRect(rnd() * w, y, r, r);
+    }
+    // A few shells and pebbles, kept clear of the printer
+    for (let i = 0; i < 9; i++) {
+      const f = 0.25 + rnd() * 0.75;
+      const y = wetEnd + (h - wetEnd) * f;
+      let px = rnd() * w;
+      if (Math.abs(px - g.cx) < g.PW * 0.9 && Math.abs(y - g.base) < g.PW * 0.6) px = (px + w * 0.5) % w;
+      const r = (3 + 9 * f) * s;
+      x.fillStyle = "rgba(60,45,30,0.22)";
+      x.beginPath();
+      x.ellipse(px + r * 0.3, y + r * 0.35, r, r * 0.45, 0, 0, Math.PI * 2);
+      x.fill();
+      x.fillStyle = rnd() < 0.5 ? "#efe6d8" : "#b9aa98";
+      x.beginPath();
+      x.ellipse(px, y, r, r * 0.5, rnd() * 0.6 - 0.3, 0, Math.PI * 2);
+      x.fill();
+      x.fillStyle = "rgba(255,255,255,0.45)";
+      x.beginPath();
+      x.ellipse(px - r * 0.3, y - r * 0.15, r * 0.35, r * 0.15, 0, 0, Math.PI * 2);
+      x.fill();
+    }
+  }
+  ppDrawLayer(c, ground, 0);
+
+  ppDepthOfField(c, w, h, g.base, h * 0.05, 2.0 * s, 3.2 * s);
+  ppFinishScene(c, w, h, "rgba(255,190,120,0.18)");
+}
+
+// --- Tropical balcony: printer on a teak table, glass balustrade with a
+// wooden handrail, palms, jungle hills and a strip of sea beyond.
+function ppDrawPalm(x, baseX, baseY, topX, topY, s, rnd) {
+  // Trunk
+  x.strokeStyle = "#6b5a46";
+  x.lineCap = "round";
+  const segs = 24;
+  for (let i = 0; i < segs; i++) {
+    const t0 = i / segs, t1 = (i + 1) / segs;
+    const bend = (tt) => [baseX + (topX - baseX) * tt + Math.sin(tt * Math.PI) * (topX - baseX) * 0.35, baseY + (topY - baseY) * tt];
+    const [ax, ay] = bend(t0), [bx, by] = bend(t1);
+    x.lineWidth = (14 - 8 * t0) * s;
+    x.strokeStyle = i % 2 ? "#6b5a46" : "#7a6853";
+    x.beginPath();
+    x.moveTo(ax, ay);
+    x.lineTo(bx, by);
+    x.stroke();
+  }
+  // Fronds
+  const fronds = 11;
+  for (let f = 0; f < fronds; f++) {
+    const ang = -Math.PI / 2 + (f / (fronds - 1) - 0.5) * Math.PI * 1.9 + (rnd() - 0.5) * 0.2;
+    const len = (110 + rnd() * 60) * s;
+    const ex = topX + Math.cos(ang) * len, ey = topY + Math.sin(ang) * len * 0.55 + len * 0.45;
+    const cxp = topX + Math.cos(ang) * len * 0.5, cyp = topY + Math.sin(ang) * len * 0.6 - len * 0.12;
+    x.strokeStyle = f % 3 ? "#2e5a2c" : "#3d6e34";
+    x.lineWidth = 3 * s;
+    x.beginPath();
+    x.moveTo(topX, topY);
+    x.quadraticCurveTo(cxp, cyp, ex, ey);
+    x.stroke();
+    // Leaflets along the frond
+    for (let k = 1; k < 16; k++) {
+      const t = k / 16;
+      const qx = (1 - t) * (1 - t) * topX + 2 * (1 - t) * t * cxp + t * t * ex;
+      const qy = (1 - t) * (1 - t) * topY + 2 * (1 - t) * t * cyp + t * t * ey;
+      const ll = (26 - 14 * t) * s;
+      x.lineWidth = Math.max(1, (3.5 - 2 * t) * s);
+      x.strokeStyle = k % 2 ? "#2b5229" : "#46783a";
+      x.beginPath();
+      x.moveTo(qx, qy);
+      x.lineTo(qx + Math.cos(ang + 1.9) * ll, qy + Math.sin(ang + 1.9) * ll + ll * 0.5);
+      x.moveTo(qx, qy);
+      x.lineTo(qx + Math.cos(ang - 1.9) * ll, qy + Math.sin(ang - 1.9) * ll + ll * 0.5);
+      x.stroke();
+    }
+  }
+  x.lineCap = "butt";
+}
+
+function ppRenderBalcony(c, w, h, g) {
+  const s = Math.min(w, h) / 1080;
+  const rnd = ppRng(777);
+  const pad = Math.ceil(60 * s);
+  const tableBack = Math.round(g.base - Math.max(g.PW * 0.55, h * 0.06));
+  const railTop = tableBack - h * 0.13;
+  const railH = 20 * s;
+  const seaY = railTop - h * 0.06;
+
+  // Far scenery: sky, sea strip, hills, jungle, palms
+  const far = ppLayer(w, h, pad);
+  {
+    const x = far.x;
+    const gr = x.createLinearGradient(0, 0, 0, seaY);
+    gr.addColorStop(0, "#6eaee0");
+    gr.addColorStop(0.6, "#a9d2ec");
+    gr.addColorStop(1, "#e6f1ef");
+    x.fillStyle = gr;
+    x.fillRect(-pad, -pad, w + pad * 2, seaY + pad);
+    const sun = x.createRadialGradient(w * 0.1, seaY * 0.3, 0, w * 0.1, seaY * 0.3, Math.max(w, h) * 0.6);
+    sun.addColorStop(0, "rgba(255,246,222,0.7)");
+    sun.addColorStop(1, "rgba(255,246,222,0)");
+    x.fillStyle = sun;
+    x.fillRect(-pad, -pad, w + pad * 2, seaY + pad);
+    ppDrawClouds(x, w, seaY, s, rnd, 6);
+    // Distant sea
+    const sg = x.createLinearGradient(0, seaY, 0, seaY + h * 0.05);
+    sg.addColorStop(0, "#4b98b6");
+    sg.addColorStop(1, "#5fb3c0");
+    x.fillStyle = sg;
+    x.fillRect(-pad, seaY, w + pad * 2, h);
+    // Two layers of hills (bluer = further)
+    const hill = (yBase, amp, color, seed) => {
+      const r2 = ppRng(seed);
+      const a = r2() * 6, b = r2() * 6;
+      x.beginPath();
+      x.moveTo(-pad, h + pad);
+      for (let xx = -pad; xx <= w + pad; xx += 10 * s) {
+        const yy = yBase - amp * (0.55 + 0.3 * Math.sin(xx / (w * 0.21) + a) + 0.15 * Math.sin(xx / (w * 0.07) + b));
+        x.lineTo(xx, yy);
+      }
+      x.lineTo(w + pad, h + pad);
+      x.closePath();
+      x.fillStyle = color;
+      x.fill();
+    };
+    hill(seaY + h * 0.012, h * 0.05, "#7d9fa3", 5);
+    hill(seaY + h * 0.035, h * 0.06, "#5f8a73", 6);
+    // Jungle canopy rising towards the railing: a dark mass, then many
+    // small leaf clusters, lit from the upper left, back to front.
+    const canopyTop = xx => seaY + h * 0.035 - h * 0.025 * (0.5 + 0.5 * Math.sin(xx / (w * 0.13) + 1.7));
+    x.beginPath();
+    x.moveTo(-pad, h + pad);
+    for (let xx = -pad; xx <= w + pad; xx += 8 * s) x.lineTo(xx, canopyTop(xx) + h * 0.02);
+    x.lineTo(w + pad, h + pad);
+    x.closePath();
+    x.fillStyle = "#24442a";
+    x.fill();
+    const clusters = Math.round(1400 * (w / 1080));
+    for (let i = 0; i < clusters; i++) {
+      const xx = rnd() * w;
+      const f = rnd();
+      const yy = canopyTop(xx) + f * (h - canopyTop(xx));
+      const r = (8 + rnd() * 20) * s * (0.7 + f * 0.8);
+      const tone = rnd();
+      x.fillStyle = tone < 0.3 ? "#2a4f2c" : tone < 0.6 ? "#356334" : tone < 0.85 ? "#4a7a3a" : "#6a9a48";
+      x.beginPath();
+      x.ellipse(xx, yy, r, r * (0.6 + rnd() * 0.3), rnd() * Math.PI, 0, Math.PI * 2);
+      x.fill();
+      if (rnd() < 0.5) {
+        x.fillStyle = "rgba(255,240,180,0.14)";
+        x.beginPath();
+        x.ellipse(xx - r * 0.3, yy - r * 0.3, r * 0.5, r * 0.3, rnd() * Math.PI, 0, Math.PI * 2);
+        x.fill();
+      }
+    }
+    ppDrawPalm(x, w * 0.08, h, w * 0.18, railTop - h * 0.27, s, rnd);
+    ppDrawPalm(x, w * 0.78, h, w * 0.86, railTop - h * 0.33, s, rnd);
+    ppDrawPalm(x, w * 0.95, h, w * 1.02, railTop - h * 0.20, s, rnd);
+    ppDrawPalm(x, w * 0.45, h, w * 0.40, railTop - h * 0.12, s * 0.8, rnd);
+  }
+  ppDrawLayer(c, far, 5.5 * s);
+
+  // Balustrade: tinted glass, posts and a teak handrail
+  const rail = ppLayer(w, h, pad);
+  {
+    const x = rail.x;
+    x.fillStyle = "rgba(200,232,238,0.16)";
+    x.fillRect(-pad, railTop + railH, w + pad * 2, h);
+    for (let i = 0; i < 4; i++) {
+      const sx = w * (0.1 + i * 0.28);
+      const gr = x.createLinearGradient(sx, 0, sx + w * 0.12, 0);
+      gr.addColorStop(0, "rgba(255,255,255,0)");
+      gr.addColorStop(0.5, "rgba(255,255,255,0.12)");
+      gr.addColorStop(1, "rgba(255,255,255,0)");
+      x.fillStyle = gr;
+      x.beginPath();
+      x.moveTo(sx, railTop + railH);
+      x.lineTo(sx + w * 0.06, railTop + railH);
+      x.lineTo(sx + w * 0.12, h);
+      x.lineTo(sx + w * 0.06, h);
+      x.closePath();
+      x.fill();
+    }
+    for (let px = w * 0.02; px < w + pad; px += w * 0.31) {
+      x.fillStyle = "#2b2d30";
+      x.fillRect(px, railTop, 9 * s, h);
+      x.fillStyle = "rgba(255,255,255,0.18)";
+      x.fillRect(px + 1.5 * s, railTop, 1.5 * s, h);
+    }
+    const hr = x.createLinearGradient(0, railTop, 0, railTop + railH);
+    hr.addColorStop(0, "#a56f43");
+    hr.addColorStop(0.4, "#8a5a34");
+    hr.addColorStop(1, "#5a3820");
+    x.fillStyle = hr;
+    x.fillRect(-pad, railTop, w + pad * 2, railH);
+    x.fillStyle = "rgba(255,230,200,0.35)";
+    x.fillRect(-pad, railTop, w + pad * 2, 2 * s);
+    x.fillStyle = "rgba(0,0,0,0.18)";
+    x.fillRect(-pad, railTop + railH, w + pad * 2, 6 * s);
+  }
+  ppDrawLayer(c, rail, 2.6 * s);
+
+  // Potted monstera at the left, mid-ground
+  const plant = ppLayer(w, h, pad);
+  {
+    const x = plant.x;
+    // Monstera leaf: heart-shaped with a pointed tip, deep side splits
+    // that stop short of the midrib, glossy upper surface. Drawn on a
+    // scratch canvas so the splits cut only the leaf itself.
+    const leaf = (lx, ly, size, ang) => {
+      const S = Math.ceil(size * 2.6);
+      const lc = ppMakeCanvas(S, S);
+      const l = lc.getContext("2d");
+      l.translate(S / 2, S / 2);
+      l.beginPath();
+      l.moveTo(0, -size * 0.78);                                     // notch at the stem
+      l.bezierCurveTo(size * 0.55, -size * 1.05, size * 1.05, -size * 0.35, size * 0.95, size * 0.2);
+      l.bezierCurveTo(size * 0.85, size * 0.7, size * 0.35, size * 1.0, 0, size * 1.15);   // tip
+      l.bezierCurveTo(-size * 0.35, size * 1.0, -size * 0.85, size * 0.7, -size * 0.95, size * 0.2);
+      l.bezierCurveTo(-size * 1.05, -size * 0.35, -size * 0.55, -size * 1.05, 0, -size * 0.78);
+      l.closePath();
+      const lg = l.createLinearGradient(-size, -size, size, size);
+      lg.addColorStop(0, "#3f7a3f");
+      lg.addColorStop(1, "#1f4a28");
+      l.fillStyle = lg;
+      l.fill();
+      l.globalCompositeOperation = "destination-out";
+      l.lineCap = "round";
+      for (let k = 0; k < 6; k++) {
+        const t = -0.55 + k * 0.28;
+        for (const side of [-1, 1]) {
+          l.lineWidth = size * (0.05 + 0.02 * (k % 2));
+          l.beginPath();
+          l.moveTo(side * size * 0.32, size * t);
+          l.lineTo(side * size * 1.2, size * (t + 0.28));
+          l.stroke();
+        }
+      }
+      l.globalCompositeOperation = "source-atop";
+      const shine = l.createRadialGradient(-size * 0.3, -size * 0.35, 0, -size * 0.3, -size * 0.35, size * 0.9);
+      shine.addColorStop(0, "rgba(220,255,200,0.30)");
+      shine.addColorStop(1, "rgba(220,255,200,0)");
+      l.fillStyle = shine;
+      l.fillRect(-S / 2, -S / 2, S, S);
+      l.strokeStyle = "rgba(190,225,160,0.45)";
+      l.lineWidth = Math.max(1, size * 0.035);
+      l.beginPath();
+      l.moveTo(0, -size * 0.78);
+      l.quadraticCurveTo(size * 0.05, size * 0.2, 0, size * 1.1);
+      l.stroke();
+      x.save();
+      x.translate(lx, ly);
+      x.rotate(ang);
+      x.drawImage(lc, -S / 2, -S / 2);
+      x.restore();
+    };
+    const baseY = tableBack + h * 0.02;
+    x.strokeStyle = "#3f6b37";
+    x.lineWidth = 5 * s;
+    const leaves = [[0.02, -0.20, 120, -0.5], [0.12, -0.26, 105, 0.3], [-0.03, -0.10, 95, -0.9], [0.17, -0.13, 85, 0.8], [0.07, -0.33, 90, 0.1]];
+    for (const [fx, fy, sz, ang] of leaves) {
+      const lx = w * fx, ly = baseY + h * fy;
+      x.beginPath();
+      x.moveTo(w * 0.07, baseY);
+      x.quadraticCurveTo(w * 0.07, (ly + baseY) / 2, lx, ly);
+      x.stroke();
+      leaf(lx, ly, sz * s, ang);
+    }
+  }
+  ppDrawLayer(c, plant, 3.2 * s);
+
+  // Teak table top, planks running across, in perspective
+  const table = ppLayer(w, h, pad);
+  {
+    const x = table.x;
+    const n = 9;
+    for (let k = 0; k < n; k++) {
+      const y0 = tableBack + (h - tableBack) * Math.pow(k / n, 1.45);
+      const y1 = tableBack + (h - tableBack) * Math.pow((k + 1) / n, 1.45);
+      const tones = ["#9b6439", "#a66d40", "#8f5a33", "#a3693c"];
+      x.fillStyle = tones[k % tones.length];
+      x.fillRect(-pad, y0, w + pad * 2, y1 - y0 + 1);
+      for (let l = 0; l < 26; l++) {
+        const yy = y0 + (y1 - y0) * rnd();
+        const ph0 = rnd() * 10, wl = (120 + rnd() * 300) * s;
+        x.beginPath();
+        for (let xx = -pad; xx <= w + pad; xx += 12 * s) {
+          const yv = yy + Math.sin(xx / wl + ph0) * (y1 - y0) * 0.12;
+          if (xx === -pad) x.moveTo(xx, yv); else x.lineTo(xx, yv);
+        }
+        x.strokeStyle = rnd() < 0.7 ? `rgba(60,30,12,${(0.06 + rnd() * 0.08).toFixed(3)})` : `rgba(255,220,180,${(0.05 + rnd() * 0.05).toFixed(3)})`;
+        x.lineWidth = Math.max(0.7, (0.6 + rnd() * 1.6) * s * (0.5 + k / n));
+        x.stroke();
+      }
+      x.fillStyle = "rgba(35,18,8,0.55)";
+      x.fillRect(-pad, y1 - Math.max(1, 2 * s * (0.4 + k / n)), w + pad * 2, Math.max(1, 2 * s * (0.4 + k / n)));
+      x.fillStyle = "rgba(255,225,190,0.12)";
+      x.fillRect(-pad, y1, w + pad * 2, Math.max(1, s));
+    }
+    // Sky reflected in the oiled teak towards the back edge
+    const sheen = x.createLinearGradient(0, tableBack, 0, tableBack + (h - tableBack) * 0.45);
+    sheen.addColorStop(0, "rgba(255,240,220,0.28)");
+    sheen.addColorStop(1, "rgba(255,240,220,0)");
+    x.fillStyle = sheen;
+    x.fillRect(-pad, tableBack, w + pad * 2, h - tableBack);
+    // Warm light from the left
+    const lg = x.createLinearGradient(0, 0, w, 0);
+    lg.addColorStop(0, "rgba(255,220,170,0.14)");
+    lg.addColorStop(1, "rgba(0,0,0,0.12)");
+    x.fillStyle = lg;
+    x.fillRect(-pad, tableBack, w + pad * 2, h - tableBack);
+    x.fillStyle = "rgba(255,230,200,0.55)";
+    x.fillRect(-pad, tableBack, w + pad * 2, Math.max(1, 2 * s));
+  }
+  ppDrawLayer(c, table, 0);
+
+  ppDepthOfField(c, w, h, g.base, h * 0.05, 1.6 * s, 3 * s);
+  ppFinishScene(c, w, h, "rgba(255,200,140,0.16)");
+}
+
+// --- Bedroom: printer resting on a white duvet, pillows and an
+// upholstered headboard behind, soft window light.
+function ppRenderBedroom(c, w, h, g) {
+  const s = Math.min(w, h) / 1080;
+  const rnd = ppRng(4242);
+  const pad = Math.ceil(70 * s);
+  const bedTop = Math.round(g.base - Math.max(g.PW * 0.7, h * 0.07));
+  const pillowH = h * 0.10 + w * 0.03;
+  const headTop = bedTop - pillowH * 0.9 - h * 0.17;
+
+  // Wall with window light, a framed print and a lamp glow
+  const wall = ppLayer(w, h, pad);
+  {
+    const x = wall.x;
+    const gr = x.createLinearGradient(0, 0, 0, bedTop);
+    gr.addColorStop(0, "#e2d9cd");
+    gr.addColorStop(1, "#d6cbbd");
+    x.fillStyle = gr;
+    x.fillRect(-pad, -pad, w + pad * 2, h + pad * 2);
+    // Window light falling on the wall (blurred separately, very soft)
+    const lightL = ppLayer(w, h, pad);
+    const lx = lightL.x;
+    lx.fillStyle = "rgba(255,246,226,0.55)";
+    lx.beginPath();
+    lx.moveTo(w * 0.02, headTop - h * 0.28);
+    lx.lineTo(w * 0.36, headTop - h * 0.26);
+    lx.lineTo(w * 0.46, headTop + h * 0.05);
+    lx.lineTo(w * 0.10, headTop + h * 0.04);
+    lx.closePath();
+    lx.fill();
+    lx.fillStyle = "rgba(214,203,189,0.9)";
+    lx.fillRect(w * 0.17, headTop - h * 0.3, w * 0.012, h * 0.4);
+    ppDrawLayer(x, lightL, 22 * s);
+    // Framed print above the headboard
+    const fw = Math.min(w * 0.34, h * 0.2), fh = fw * 0.72;
+    const fx = w * 0.55 - fw / 2, fy = headTop - fh - h * 0.04;
+    x.fillStyle = "rgba(0,0,0,0.12)";
+    x.fillRect(fx + 6 * s, fy + 8 * s, fw, fh);
+    x.fillStyle = "#c2ab8c";
+    x.fillRect(fx, fy, fw, fh);
+    x.fillStyle = "#f3eee6";
+    x.fillRect(fx + fw * 0.05, fy + fh * 0.07, fw * 0.9, fh * 0.86);
+    const art = x.createLinearGradient(fx, fy, fx + fw, fy + fh);
+    art.addColorStop(0, "#c9b39a");
+    art.addColorStop(0.5, "#d9c7ae");
+    art.addColorStop(1, "#9fae9b");
+    x.fillStyle = art;
+    x.fillRect(fx + fw * 0.15, fy + fh * 0.18, fw * 0.7, fh * 0.64);
+    // Bedside lamp glow at the right
+    const lampX = w * 0.93, lampY = bedTop - pillowH * 1.4;
+    const glow = x.createRadialGradient(lampX, lampY, 0, lampX, lampY, w * 0.45);
+    glow.addColorStop(0, "rgba(255,214,150,0.55)");
+    glow.addColorStop(1, "rgba(255,214,150,0)");
+    x.fillStyle = glow;
+    x.fillRect(-pad, -pad, w + pad * 2, h + pad * 2);
+    x.fillStyle = "#f2e2c4";
+    x.beginPath();
+    x.moveTo(lampX - w * 0.07, lampY + h * 0.03);
+    x.lineTo(lampX + w * 0.07, lampY + h * 0.03);
+    x.lineTo(lampX + w * 0.05, lampY - h * 0.04);
+    x.lineTo(lampX - w * 0.05, lampY - h * 0.04);
+    x.closePath();
+    x.fill();
+  }
+  ppDrawLayer(c, wall, 5 * s);
+
+  // Upholstered, channel-tufted headboard
+  const head = ppLayer(w, h, pad);
+  {
+    const x = head.x;
+    const hx0 = -w * 0.04, hw = w * 1.08;
+    ppRoundRect(x, hx0, headTop, hw, bedTop - headTop + h * 0.02, 40 * s);
+    x.fillStyle = "#b5a593";
+    x.fill();
+    x.save();
+    x.clip();
+    const ch = w * 0.075;
+    for (let cx0 = hx0; cx0 < hx0 + hw; cx0 += ch) {
+      const gr = x.createLinearGradient(cx0, 0, cx0 + ch, 0);
+      gr.addColorStop(0, "rgba(70,55,40,0.30)");
+      gr.addColorStop(0.18, "rgba(255,255,255,0.06)");
+      gr.addColorStop(0.5, "rgba(255,255,255,0.14)");
+      gr.addColorStop(0.82, "rgba(255,255,255,0.04)");
+      gr.addColorStop(1, "rgba(70,55,40,0.30)");
+      x.fillStyle = gr;
+      x.fillRect(cx0, headTop, ch, bedTop - headTop + h * 0.02);
+    }
+    const top = x.createLinearGradient(0, headTop, 0, headTop + h * 0.05);
+    top.addColorStop(0, "rgba(255,255,255,0.22)");
+    top.addColorStop(1, "rgba(255,255,255,0)");
+    x.fillStyle = top;
+    x.fillRect(hx0, headTop, hw, h * 0.05);
+    ppGrain(x, hx0, headTop, hw, bedTop - headTop, 0.10);
+    x.restore();
+  }
+  ppDrawLayer(c, head, 3.6 * s);
+
+  // Pillows
+  const pil = ppLayer(w, h, pad);
+  {
+    const x = pil.x;
+    const pillow = (pcx, pcy, pw2, ph2, tone, tilt) => {
+      x.save();
+      x.translate(pcx, pcy);
+      x.rotate(tilt);
+      x.fillStyle = "rgba(60,50,40,0.18)";
+      x.beginPath();
+      x.ellipse(pw2 * 0.03, ph2 * 0.42, pw2 * 0.5, ph2 * 0.18, 0, 0, Math.PI * 2);
+      x.fill();
+      x.beginPath();
+      x.moveTo(-pw2 / 2, -ph2 * 0.35);
+      x.quadraticCurveTo(0, -ph2 * 0.62, pw2 / 2, -ph2 * 0.35);
+      x.quadraticCurveTo(pw2 * 0.56, 0, pw2 / 2, ph2 * 0.38);
+      x.quadraticCurveTo(0, ph2 * 0.55, -pw2 / 2, ph2 * 0.38);
+      x.quadraticCurveTo(-pw2 * 0.56, 0, -pw2 / 2, -ph2 * 0.35);
+      x.closePath();
+      const gr = x.createRadialGradient(-pw2 * 0.1, -ph2 * 0.1, pw2 * 0.05, 0, 0, pw2 * 0.62);
+      gr.addColorStop(0, tone[0]);
+      gr.addColorStop(1, tone[1]);
+      x.fillStyle = gr;
+      x.fill();
+      x.strokeStyle = "rgba(120,105,90,0.25)";
+      x.lineWidth = 2 * s;
+      x.stroke();
+      x.restore();
+    };
+    const white = ["#fbf9f5", "#d8d1c6"];
+    pillow(w * 0.27, bedTop - pillowH * 0.35, w * 0.50, pillowH, white, -0.03);
+    pillow(w * 0.76, bedTop - pillowH * 0.32, w * 0.50, pillowH, white, 0.035);
+    pillow(w * 0.15, bedTop - pillowH * 0.05, w * 0.28, pillowH * 0.75, ["#b6c0a9", "#8e9a83"], -0.08);
+  }
+  ppDrawLayer(c, pil, 2.4 * s);
+
+  // Duvet: soft folds and linen texture
+  const duvet = ppLayer(w, h, pad);
+  {
+    const x = duvet.x;
+    const gr = x.createLinearGradient(0, bedTop, 0, h);
+    gr.addColorStop(0, "#ece6dd");
+    gr.addColorStop(0.35, "#f5f1eb");
+    gr.addColorStop(1, "#e7e0d6");
+    x.fillStyle = gr;
+    x.fillRect(-pad, bedTop - 4 * s, w + pad * 2, h - bedTop + pad + 4 * s);
+    const folds = ppLayer(w, h, pad);
+    const fx = folds.x;
+    for (let i = 0; i < 18; i++) {
+      const y0 = bedTop + (h - bedTop) * (0.05 + rnd() * 0.95);
+      const amp = (10 + rnd() * 40) * s, wl = (150 + rnd() * 400) * s, ph0 = rnd() * 10;
+      const ang = (rnd() - 0.5) * 0.25;
+      fx.beginPath();
+      for (let xx = -pad; xx <= w + pad; xx += 10 * s) {
+        const yy = y0 + Math.sin(xx / wl + ph0) * amp + (xx - w / 2) * ang;
+        if (xx === -pad) fx.moveTo(xx, yy); else fx.lineTo(xx, yy);
+      }
+      const lw = (25 + rnd() * 70) * s;
+      fx.strokeStyle = "rgba(120,104,88,0.16)";
+      fx.lineWidth = lw;
+      fx.stroke();
+      fx.save();
+      fx.translate(0, -lw * 0.55);
+      fx.strokeStyle = "rgba(255,255,255,0.55)";
+      fx.lineWidth = lw * 0.45;
+      fx.stroke();
+      fx.restore();
+    }
+    ppDrawLayer(x, folds, 16 * s);
+    // Linen weave
+    for (let yy = bedTop; yy < h + pad; yy += 3 * s) {
+      x.fillStyle = `rgba(150,135,118,${(0.02 + rnd() * 0.03).toFixed(3)})`;
+      x.fillRect(-pad, yy, w + pad * 2, Math.max(0.6, 0.7 * s));
+    }
+    ppGrain(x, -pad, bedTop, w + pad * 2, h - bedTop + pad, 0.08);
+    // Light from the window side
+    const lg = x.createLinearGradient(0, 0, w, 0);
+    lg.addColorStop(0, "rgba(255,246,226,0.18)");
+    lg.addColorStop(1, "rgba(60,50,40,0.08)");
+    x.fillStyle = lg;
+    x.fillRect(-pad, bedTop, w + pad * 2, h - bedTop + pad);
+  }
+  ppDrawLayer(c, duvet, 0);
+
+  ppDepthOfField(c, w, h, g.base, h * 0.05, 1.6 * s, 3 * s);
+  ppFinishScene(c, w, h, "rgba(255,214,170,0.14)");
+}
+
+// --- Shadows and lighting that tie the printer into its scene ---
+// Cast shadow of the printer, and of the paper as it emerges, projected
+// onto the surface the printer rests on.
+function ppDrawCastShadow(c, g, sc, emergedPx) {
+  const sh = sc.shadow;
+  if (!sh) return;
+  const devH = g.base - g.yT;
+  const x0 = g.cx - g.PW / 2, x1 = g.cx + g.PW / 2;
+  const quad = (a, b, h0, h1) => {
+    c.moveTo(a + sh.dx * h0, g.base + sh.dy * h0);
+    c.lineTo(b + sh.dx * h0, g.base + sh.dy * h0);
+    c.lineTo(b + sh.dx * h1, g.base + sh.dy * h1);
+    c.lineTo(a + sh.dx * h1, g.base + sh.dy * h1);
+    c.closePath();
+  };
+  c.save();
+  c.filter = `blur(${Math.max(1, g.PW * sh.blur).toFixed(1)}px)`;
+  c.fillStyle = `rgba(${sh.rgb},${sh.alpha})`;
+  c.beginPath();
+  quad(x0 + g.PW * 0.04, x1 - g.PW * 0.04, 0, devH * 0.95);
+  if (emergedPx > 1) quad(g.cx - g.pw / 2, g.cx + g.pw / 2, devH * 0.92, devH * 0.92 + emergedPx);
+  c.fill();
+  c.restore();
+}
+
+// Tight contact/occlusion shadow where the printer meets the surface;
+// on the bed it's wider and softer, as if sinking slightly into the duvet.
+function ppDrawSceneContact(c, g, sc) {
+  const wide = sc.soft ? 1.25 : 1;
+  c.save();
+  c.translate(g.cx, g.base);
+  c.scale(1, sc.soft ? 0.14 : 0.07);
+  const r = g.PW * 0.56 * wide;
+  const gr = c.createRadialGradient(0, 0, r * 0.35, 0, 0, r);
+  gr.addColorStop(0, `rgba(30,20,10,${sc.contact})`);
+  gr.addColorStop(1, "rgba(30,20,10,0)");
+  c.fillStyle = gr;
+  c.beginPath();
+  c.arc(0, 0, r, 0, Math.PI * 2);
+  c.fill();
+  c.restore();
+}
+
+// Scene light on the printer body: warm on the lit side, cooler on the
+// shaded side, plus a rim highlight when backlit (beach sun).
+function ppDrawSceneLighting(c, g, sc) {
+  const t = sc.tint;
+  if (!t) return;
+  const x0 = g.cx - g.PW / 2, x1 = g.cx + g.PW / 2;
+  c.save();
+  ppPrinterSilhouette(c, g);
+  c.clip();
+  c.globalCompositeOperation = "soft-light";
+  const gr = c.createLinearGradient(t.lightFromRight ? x1 : x0, 0, t.lightFromRight ? x0 : x1, 0);
+  gr.addColorStop(0, t.warm);
+  gr.addColorStop(1, t.cool);
+  c.fillStyle = gr;
+  c.fillRect(x0, g.yT, g.PW, g.base - g.yT);
+  c.restore();
+  if (t.rim) {
+    c.save();
+    ppPrinterSilhouette(c, g);
+    c.clip();
+    const rim = c.createLinearGradient(x1, 0, x1 - g.PW * 0.06, 0);
+    rim.addColorStop(0, t.rim);
+    rim.addColorStop(1, "rgba(255,255,255,0)");
+    c.fillStyle = rim;
+    c.fillRect(x1 - g.PW * 0.06, g.yT, g.PW * 0.06, g.base - g.yT);
+    c.restore();
+  }
 }
 
 function drawPhotoPrintScene(p) {
   const w = canvas.width, h = canvas.height;
   const g = photoPrintGeometry(w, h, photoPrint.image, photoPrint.printer);
   const timing = photoPrintTiming(ppClamp01(p), photoPrint.speed);
+  const sceneName = PP_SCENES[photoPrint.background] ? photoPrint.background : "studio";
+  const sc = PP_SCENES[sceneName];
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
   ctx.filter = "none";
-  ppDrawBackground(ctx, g, w, h);
-  ppDrawContactShadow(ctx, g);
-  ppDrawTopSurface(ctx, g);
-  ppDrawSlot(ctx, g);
+
+  if (sceneName === "studio") {
+    ppDrawBackground(ctx, g, w, h);
+    ppDrawContactShadow(ctx, g);
+  } else {
+    ctx.drawImage(ppGetSceneCanvas(sceneName, w, h, g), 0, 0);
+    const emergedPx = photoPrint.image ? timing.emerge * g.ph * PP_FINAL_OUT : 0;
+    ppDrawCastShadow(ctx, g, sc, emergedPx);
+    ppDrawSceneContact(ctx, g, sc);
+  }
+
+  // Subtle mechanical vibration while the feed motor runs: under ~1px
+  // at preview size, eased in and out at the start/end of printing.
+  const env = timing.printing ? ppSmoothstep(timing.raw / 0.06) * ppSmoothstep((1 - timing.raw) / 0.06) : 0;
+  const vib = env * g.PW * 0.0035 * (Math.sin(timing.t * Math.PI * 2 * 9) + 0.5 * Math.sin(timing.t * Math.PI * 2 * 13 + 1.3));
+  ctx.translate(0, vib);
+
+  ppDrawPrinterBack(ctx, g);
   if (photoPrint.image) ppDrawPaper(ctx, g, timing, photoPrint.image);
-  ppDrawSlotLip(ctx, g);
-  ppDrawFrontFace(ctx, g);
-  if (photoPrint.printer === "generic") ppDrawGenericDetails(ctx, g, timing);
-  else ppDrawSelphyDetails(ctx, g, timing);
+  ppDrawPrinterFront(ctx, g, timing);
+  if (sceneName !== "studio") ppDrawSceneLighting(ctx, g, sc);
+  ppDrawPrinterLights(ctx, g, timing);
   ctx.restore();
 }
 
@@ -2785,6 +4233,13 @@ document.querySelectorAll('input[name="photoPrintPrinter"]').forEach(radio => {
   radio.addEventListener("change", () => {
     if (!radio.checked) return;
     photoPrint.printer = radio.value;
+    redrawPhotoPrintIfVisible();
+  });
+});
+document.querySelectorAll('input[name="photoPrintBackground"]').forEach(radio => {
+  radio.addEventListener("change", () => {
+    if (!radio.checked) return;
+    photoPrint.background = radio.value;
     redrawPhotoPrintIfVisible();
   });
 });
