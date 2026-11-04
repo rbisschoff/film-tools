@@ -888,10 +888,10 @@
     </div>
     <div class="photo-print-group-label">Printer appearance</div>
     <div class="output-mode-row">
-      <label><input type="radio" name="photoPrintPrinter" value="instax" checked> Instax Link-inspired handheld</label>
+      <label><input type="radio" name="photoPrintPrinter" value="instax"> Instax Link-inspired handheld</label>
       <label><input type="radio" name="photoPrintPrinter" value="qx20"> SELPHY QX20-inspired compact</label>
       <label><input type="radio" name="photoPrintPrinter" value="generic"> Generic compact printer</label>
-      <label><input type="radio" name="photoPrintPrinter" value="selphy"> Classic desktop (SELPHY-inspired)</label>
+      <label><input type="radio" name="photoPrintPrinter" value="selphy" checked> Classic desktop (SELPHY-inspired)</label>
     </div>
     <div class="photo-print-group-label">Background</div>
     <div class="output-mode-row">
@@ -1054,7 +1054,8 @@ const photoPrint = {
   speed: 1,             // 0.5-2
   scale: 1,             // 0.7-1.3
   border: true,
-  printer: "instax",    // "instax" | "qx20" | "generic" | "selphy" (classic desktop)
+  printer: "selphy",    // "instax" | "qx20" | "generic" | "selphy" (classic desktop - the default,
+                        // a flat desktop printer that keeps the print the dominant subject)
   background: "beach",  // "beach" | "balcony" | "bedroom" | "studio"
   format: "9:16",
   progress: 1,          // 0..1 - the single value preview and export both draw from
@@ -2772,7 +2773,7 @@ function ppNoise() {
 let ppSampleCanvas = null;
 function ppSampleImage() {
   if (ppSampleCanvas) return ppSampleCanvas;
-  const W = 1500, H = 1000, hz = H * 0.56; // horizon
+  const W = 1000, H = 1500, hz = H * 0.56; // portrait, like most phone photos; horizon
   const c = ppMakeCanvas(W, H);
   const x = c.getContext("2d");
   const rnd = ppRng(2024);
@@ -4293,73 +4294,48 @@ function updatePhotoPrintBgNote() {
   el.classList.toggle("error", isError);
 }
 
-// Real-scale crop/zoom (the previous composition): printer and photo
-// scale together at real-world size. Now only used as the reference size
-// that the photo-first framing below doubles (see ppHeroPW).
-function ppRealScaleLayout(spec, img, w, h, model, image) {
-  const iw = img.width, ih = img.height;
-  const cover = Math.max(w / iw, h / ih);
-  const m = PP_MODELS[model];
-  const mm = PP_MODEL_MM[model];
-  const units = ppStackUnits(model, image, spec.topScale);
-  const targetPW = Math.min(w * m.sizeFrac, (h * 0.62) / units);
-  let s = Math.max(cover, Math.min(1.25, targetPW / (mm * spec.pxPerMm)));
-  const baseFrac = h > w * 1.2 ? 0.80 : 0.87;
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-  for (let pass = 0; ; pass++) {
-    const dw = iw * s, dh = ih * s;
-    const offX = Math.round(clamp(spec.surfaceX * dw - w / 2, 0, dw - w));
-    const offY = Math.round(clamp(spec.surfaceY * dh - h * baseFrac, 0, dh - h));
-    const base = spec.surfaceY * dh - offY;
-    const cx = spec.surfaceX * dw - offX;
-    let PW = mm * spec.pxPerMm * s;
-    const fits = base - units * PW >= h * 0.05;
-    if (fits || s <= cover * 1.0001 || pass > 12) {
-      if (!fits) PW = Math.max(PW * 0.5, (base - h * 0.05) / units); // last resort only
-      return { s, dw, dh, offX, offY, anchor: { PW, base, cx: clamp(cx, PW * 0.6, w - PW * 0.6), topScale: spec.topScale } };
-    }
-    s = Math.max(cover, s * 0.92);
-  }
-}
-
 // --- Photo-first framing ---
-// The printed photograph is the subject: the "camera" moves in so the
-// print is ~2x the size it had at real-scale framing, and the printer
-// becomes the object it rises out of - same proportions, sitting low in
-// the frame, cropped by the bottom edge when the frame can't hold all of
-// it (as in a close-up product shot). Caps per format keep the print
-// fully in frame with breathing room and stop the printer filling the
-// width.
-// minPh: the print is never shown smaller than this share of the frame
-// height (matters for the small Instax card, whose ~2x size would still
-// leave the tall printer body dominating the frame).
-const PP_HERO_CAPS = {
-  tall:   { ph: 0.40, pw: 0.72, PW: 0.90, minPh: 0.38 },  // 9:16
-  square: { ph: 0.50, pw: 0.62, PW: 0.80, minPh: 0.46 },  // 1:1
-  wide:   { ph: 0.60, pw: 0.56, PW: 0.64, minPh: 0.52 }   // 16:9
+// The printed photograph is the subject and the printer only shows
+// enough of itself to make clear the photo is coming out of it - framed
+// after the reference product shot (9:16: portrait print ~49% of the
+// width x ~41% of the height, printer ~75% of the width with only ~18%
+// of the frame height of it visible). Per format:
+//   PW      printer width (fraction of frame width) - real proportions,
+//           so the print is the paper's share of it (55-76%)
+//   phMax / pwMax   the print never exceeds these shares of the frame
+//   centre  where the print's centre sits (fraction of frame height)
+//   vis     printer visible below the slot, at most this x print height
+//           (0.44 ~ 18% / 41% in the reference). Flat printers show
+//           whole; a taller body (the upright Instax) is cropped by the
+//           frame's bottom edge, the print moving down for it no lower
+//           than centreMax.
+const PP_HERO = {
+  tall:   { PW: 0.75, phMax: 0.44, pwMax: 0.60, centre: 0.43, centreMax: 0.52, vis: 0.44 },  // 9:16
+  square: { PW: 0.62, phMax: 0.56, pwMax: 0.56, centre: 0.42, centreMax: 0.54, vis: 0.44 },  // 1:1
+  wide:   { PW: 0.42, phMax: 0.62, pwMax: 0.42, centre: 0.41, centreMax: 0.50, vis: 0.44 }   // 16:9
 };
 function ppFrameShape(w, h) { return h > w * 1.2 ? "tall" : w > h * 1.2 ? "wide" : "square"; }
 
-function ppHeroPW(w, h, model, image, refPW) {
-  const m = PP_MODELS[model];
-  const [pwU, phU] = ppPaperSize(m, image);
-  const cap = PP_HERO_CAPS[ppFrameShape(w, h)];
-  const target = Math.max(refPW * 2, (cap.minPh * h) / phU);
-  return Math.min(target, (cap.ph * h) / phU, (cap.pw * w) / pwU, cap.PW * w);
+function ppHeroPW(w, h, model, image) {
+  const [pwU, phU] = ppPaperSize(PP_MODELS[model], image);
+  const f = PP_HERO[ppFrameShape(w, h)];
+  return Math.min(f.PW * w, (f.phMax * h) / phU, (f.pwMax * w) / pwU);
 }
 
-// Vertical placement: the whole printer + finished print centred in the
-// frame when it fits; otherwise the print keeps a fixed top margin and
-// the printer runs off the bottom edge. The printer is the supporting
-// object, so at most 0.85x the print's height of it shows below the
-// slot: a taller body (the upright Instax) is cropped by the bottom edge
-// instead, moving the print down no further than the frame's centre.
-function ppHeroBase(h, PW, units, ph) {
-  const total = units * PW;
-  let paperTop = Math.max(h * 0.055, (h - total) * 0.5);
-  const showPrinterTop = h - ph * 0.85 - ph * PP_FINAL_OUT; // paper top that leaves 0.85*ph of printer
-  if (showPrinterTop > paperTop) paperTop = Math.max(paperTop, Math.min(showPrinterTop, h * 0.5 - ph / 2));
-  return paperTop + total;
+// Printer base y for the photo-first framing (may be below the frame).
+function ppHeroBase(w, h, PW, units, ph) {
+  const f = PP_HERO[ppFrameShape(w, h)];
+  const total = units * PW;                  // printer + finished print
+  const out = ph * PP_FINAL_OUT;             // paper above the slot
+  const below = total - out;                 // printer below the slot
+  let slotY = f.centre * h + out / 2;
+  const visMax = f.vis * ph;
+  if (below > visMax && slotY + below > h * 0.97) {
+    // Too much printer would show: crop it with the frame's bottom edge.
+    slotY = Math.max(slotY, Math.min(h - visMax, f.centreMax * h + out / 2));
+  }
+  slotY = Math.max(slotY, h * 0.05 + out);   // print never leaves the top
+  return slotY + below;
 }
 
 // Studio tabletop: no photo to anchor to, so just the photo-first size
@@ -4367,10 +4343,9 @@ function ppHeroBase(h, PW, units, ph) {
 function ppStudioAnchor(w, h, model, image) {
   const m = PP_MODELS[model];
   const units = ppStackUnits(model, image, 1);
-  const refPW = Math.min(w * m.sizeFrac, (h * 0.64) / units);
-  const PW = ppHeroPW(w, h, model, image, refPW);
+  const PW = ppHeroPW(w, h, model, image);
   const ph = PW * ppPaperSize(m, image)[1];
-  return { PW, base: ppHeroBase(h, PW, units, ph), cx: w / 2, topScale: 1 };
+  return { PW, base: ppHeroBase(w, h, PW, units, ph), cx: w / 2, topScale: 1 };
 }
 
 // Photographic scenes: printer/print at the photo-first size, and the
@@ -4380,10 +4355,9 @@ function ppStudioAnchor(w, h, model, image) {
 // (zoom at most 1.6x the source pixels - it is out of focus anyway) and
 // receives depth-of-field blur in ppPhotoBackground.
 function ppPhotoLayout(spec, img, w, h, model, image) {
-  const ref = ppRealScaleLayout(spec, img, w, h, model, image);
   const units = ppStackUnits(model, image, spec.topScale);
-  const PW = ppHeroPW(w, h, model, image, ref.anchor.PW);
-  const base = ppHeroBase(h, PW, units, PW * ppPaperSize(PP_MODELS[model], image)[1]);
+  const PW = ppHeroPW(w, h, model, image);
+  const base = ppHeroBase(w, h, PW, units, PW * ppPaperSize(PP_MODELS[model], image)[1]);
   const iw = img.width, ih = img.height;
   const cover = Math.max(w / iw, h / ih);
   const realS = PW / (PP_MODEL_MM[model] * spec.pxPerMm);
@@ -4402,7 +4376,7 @@ function ppPhotoLayout(spec, img, w, h, model, image) {
   const half = PW / 2 + w * 0.03;
   let cx = clamp(sx, w * 0.38, w * 0.62);
   cx = half * 2 >= w ? w / 2 : clamp(cx, half, w - half);
-  return { s, dw, dh, offX, offY, focusY: spec.surfaceY * dh - offY, refPW: ref.anchor.PW,
+  return { s, dw, dh, offX, offY, focusY: spec.surfaceY * dh - offY,
            anchor: { PW, base, cx, topScale: spec.topScale } };
 }
 
