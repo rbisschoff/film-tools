@@ -196,6 +196,41 @@
       .three-stack-header { flex-direction: column; gap: 3px; }
       .stack-slots { grid-template-columns: 1fr; }
     }
+  /* Photo Printing Animation panel - same panel styling as the 3-stack
+     panel. Needs its own [hidden] rule for the same reason .controls
+     does (see the comment above .controls[hidden]). */
+  .photo-print-controls {
+    width: 100%;
+    max-width: 960px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px;
+  }
+  .photo-print-controls[hidden] { display: none; }
+  .photo-print-controls h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 10px;
+    font-weight: 600;
+  }
+  .photo-print-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 16px;
+  }
+  .photo-print-grid > * { min-width: 0; }
+  @media (max-width: 620px) {
+    .photo-print-grid { grid-template-columns: 1fr; }
+  }
+  .photo-print-controls .filename.error { color: #e0907a; white-space: normal; }
+  .photo-print-group-label {
+    font-size: 10px;
+    color: var(--muted);
+    margin: 10px 0 5px;
+  }
   
     .slot {
     background: var(--panel);
@@ -655,6 +690,7 @@
       <label><input type="radio" name="aspectRatio" value="1:1"> 1:1 (Square)</label>
       <label><input type="radio" name="aspectRatio" value="4:5"> 4:5 (Feed)</label>
       <label><input type="radio" name="aspectRatio" value="3-stack"> 3 × Horizontal — Stacked (1080×1920)</label>
+      <label><input type="radio" name="aspectRatio" value="photo-print"> Photo Printing Animation</label>
     </div>
   </div>
 
@@ -827,6 +863,42 @@
     </div>
   </div>
 
+  <div class="photo-print-controls" id="photoPrintControls" hidden>
+    <h2>Photo Printing Animation</h2>
+    <label class="file-btn" for="photoPrintFile">Choose photo (JPEG, PNG or WebP)</label>
+    <input type="file" id="photoPrintFile" accept="image/jpeg,image/png,image/webp" class="file-input-hidden">
+    <div class="filename" id="photoPrintName">No photo selected</div>
+    <div class="photo-print-grid">
+      <div class="zoom-row">
+        <label class="zoom-label" for="photoPrintDuration">Animation duration <span id="photoPrintDurationValue">8.0s</span></label>
+        <input type="range" id="photoPrintDuration" min="4" max="12" step="0.5" value="8">
+      </div>
+      <div class="zoom-row">
+        <label class="zoom-label" for="photoPrintSpeed">Print speed <span id="photoPrintSpeedValue">1.00×</span></label>
+        <input type="range" id="photoPrintSpeed" min="0.5" max="2" step="0.05" value="1">
+      </div>
+      <div class="zoom-row">
+        <label class="zoom-label" for="photoPrintScale">Photo scale <span id="photoPrintScaleValue">100%</span></label>
+        <input type="range" id="photoPrintScale" min="70" max="130" step="1" value="100">
+      </div>
+      <label class="fade-toggle-row">
+        <input type="checkbox" id="photoPrintBorder" checked>
+        <span>White photo-paper border</span>
+      </label>
+    </div>
+    <div class="photo-print-group-label">Printer appearance</div>
+    <div class="output-mode-row">
+      <label><input type="radio" name="photoPrintPrinter" value="selphy" checked> SELPHY-inspired</label>
+      <label><input type="radio" name="photoPrintPrinter" value="generic"> Generic compact printer</label>
+    </div>
+    <div class="photo-print-group-label">Output format</div>
+    <div class="output-mode-row">
+      <label><input type="radio" name="photoPrintFormat" value="9:16" checked> 9:16 — 1080×1920</label>
+      <label><input type="radio" name="photoPrintFormat" value="1:1"> 1:1 — 1080×1080</label>
+      <label><input type="radio" name="photoPrintFormat" value="16:9"> 16:9 — 1920×1080</label>
+    </div>
+  </div>
+
   <div class="output-panel">
     <h2>Output length</h2>
     <div class="output-mode-row">
@@ -951,10 +1023,48 @@ let layoutMode = "standard";
 // drawFrame()'s isThreeStack() branch (see below) - has no effect on
 // any other layout mode, zoom/pan, trim, speed, or audio.
 let stackDividerColor = "none";
+
+// Photo Printing Animation - a standalone mode (layoutMode
+// "photo-print") that renders a programmatically drawn compact photo
+// printer printing the uploaded photo. It uses no video slots and no
+// audio: getActiveSlotNames() returns [] in this mode so nothing that
+// iterates the video slots can pick them up. Declared up here (before
+// the first applyAspectRatio() call below) so nothing can hit it in its
+// temporal dead zone.
+const PHOTO_PRINT_FORMATS = {
+  "9:16": { width: 1080, height: 1920 },
+  "1:1": { width: 1080, height: 1080 },
+  "16:9": { width: 1920, height: 1080 }
+};
+const photoPrint = {
+  image: null,          // downscaled working copy of the photo (a canvas)
+  fileName: "",
+  loadToken: 0,
+  duration: 8,          // seconds, 4-12
+  speed: 1,             // 0.5-2
+  scale: 1,             // 0.7-1.3
+  border: true,
+  printer: "selphy",    // "selphy" | "generic"
+  format: "9:16",
+  progress: 0,          // 0..1 - the single value preview and export both draw from
+  baseProgress: 0,
+  startTime: 0,
+  playing: false,
+  rafId: null,
+  exporting: false
+};
+
 function isThreeStack() { return layoutMode === "3-stack"; }
-function getActiveSlotNames() { return isThreeStack() ? ["stack1", "stack2", "stack3"] : ["top", "bottom"]; }
+function isPhotoPrint() { return layoutMode === "photo-print"; }
+function getActiveSlotNames() {
+  if (isPhotoPrint()) return [];
+  return isThreeStack() ? ["stack1", "stack2", "stack3"] : ["top", "bottom"];
+}
 function getActiveSlots() { return getActiveSlotNames().map(name => state[name]); }
-function allActiveReady() { return getActiveSlots().every(slot => slot.ready); }
+function allActiveReady() {
+  if (isPhotoPrint()) return !!photoPrint.image;
+  return getActiveSlots().every(slot => slot.ready);
+}
 
 // How long a clip's trimmed segment actually plays for at its chosen
 // speed - a 4s trim at 2x plays in 2s, at 0.5x it plays in 8s. This is
@@ -1035,11 +1145,31 @@ const ASPECT_RATIOS = {
 function updateLayoutVisibility() {
   const three = document.getElementById("threeStackControls");
   const standard = document.querySelector(".controls");
+  const photo = document.getElementById("photoPrintControls");
   if (three) three.hidden = !isThreeStack();
-  if (standard) standard.hidden = isThreeStack();
+  if (standard) standard.hidden = isThreeStack() || isPhotoPrint();
+  if (photo) photo.hidden = !isPhotoPrint();
+  // Output length, text overlay and background music only apply to the
+  // video modes - the photo animation has its own duration and no audio.
+  [".output-panel", ".text-panel", ".audio-panel"].forEach(sel => {
+    const el = document.querySelector(sel);
+    if (el) el.hidden = isPhotoPrint();
+  });
 }
 
 function applyAspectRatio(key) {
+  // Switching into or out of the photo animation stops whichever preview
+  // is running first (while getActiveSlots() still describes the mode
+  // being left). Only reached on a user-driven switch - the initial
+  // applyAspectRatio("9:16") call at load never touches `playing` (which
+  // is declared further down and would still be in its TDZ).
+  const wasPhotoPrint = isPhotoPrint();
+  if (key === "photo-print" || wasPhotoPrint) stopAllPreviews();
+  if (key === "photo-print") {
+    applyPhotoPrintLayout();
+    return;
+  }
+
   if (key === "3-stack") {
     layoutMode = "3-stack";
     // Root-cause fix: "3 x Horizontal" means three horizontal (16:9)
@@ -1067,6 +1197,7 @@ function applyAspectRatio(key) {
     STACK_W = W;
     STACK_H = H / 3;
     updateLayoutVisibility();
+    if (wasPhotoPrint) playBtn.disabled = !allActiveReady();
     if (allActiveReady()) drawFrame();
     updateExportAvailability();
     return;
@@ -1086,7 +1217,25 @@ function applyAspectRatio(key) {
   BOTTOM_Y = TOP_H + BAR_H;
   STACK_W = W; STACK_H = H / 3; // unused outside 3-stack mode; kept defined for consistency
   updateLayoutVisibility();
+  if (wasPhotoPrint) playBtn.disabled = !allActiveReady();
   if (allActiveReady()) drawFrame();
+  updateExportAvailability();
+}
+
+// Canvas setup for the photo animation - its own three output formats,
+// independent of the 9:16 / 1:1 / 4:5 video presets above.
+function applyPhotoPrintLayout() {
+  layoutMode = "photo-print";
+  const dims = PHOTO_PRINT_FORMATS[photoPrint.format] || PHOTO_PRINT_FORMATS["9:16"];
+  canvas.width = dims.width;
+  canvas.height = dims.height;
+  canvas.style.aspectRatio = `${dims.width}/${dims.height}`;
+  W = dims.width; H = dims.height;
+  BAR_H = 0; VIDEO_H = H;
+  STACK_W = W; STACK_H = H / 3;
+  updateLayoutVisibility();
+  drawFrame();
+  playBtn.disabled = !photoPrint.image || photoPrint.exporting;
   updateExportAvailability();
 }
 
@@ -1249,6 +1398,10 @@ function loadFile(slotName, file) {
 // this is the single source of truth either way rather than trusting
 // that invariant silently.
 function updateExportAvailability() {
+  if (isPhotoPrint()) {
+    exportBtn.disabled = !photoPrint.image || photoPrint.exporting;
+    return;
+  }
   const activeSlots = getActiveSlots();
   const ready = activeSlots.every(slot => slot.ready);
   const valid = activeSlots.every(slot => (slot.trimEnd - slot.trimStart) > 0);
@@ -1256,6 +1409,13 @@ function updateExportAvailability() {
 }
 
 function checkReady() {
+  // A video can finish loading in the background while the photo
+  // animation is showing - it must not take over the transport/canvas.
+  if (isPhotoPrint()) {
+    playBtn.disabled = !photoPrint.image || photoPrint.exporting;
+    updateExportAvailability();
+    return;
+  }
   const activeNames = getActiveSlotNames();
   const activeSlots = getActiveSlots();
   const ready = activeSlots.every(slot => slot.ready);
@@ -1378,6 +1538,10 @@ function drawTextOverlay() {
 }
 
 function drawFrame() {
+  if (isPhotoPrint()) {
+    drawPhotoPrintScene(photoPrint.progress);
+    return;
+  }
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, W, H);
 
@@ -1996,6 +2160,7 @@ function previewLoop() {
 }
 
 playBtn.addEventListener("click", () => {
+  if (isPhotoPrint()) { togglePhotoPrintPlayback(); return; }
   if (!allActiveReady()) return;
   playing = !playing;
   playBtn.textContent = playing ? "Pause" : "Play";
@@ -2013,6 +2178,738 @@ playBtn.addEventListener("click", () => {
     cancelAnimationFrame(rafId);
   }
 });
+
+// ======================================================================
+// --- Photo Printing Animation ---
+// ======================================================================
+// Everything the animation shows is a pure function of one progress
+// value p (0..1): drawPhotoPrintScene(p). Preview advances p in real
+// time; export steps it frame by frame - same function, same timing
+// math, so the exported MP4 matches the preview exactly.
+
+function ppClamp01(x) { return Math.max(0, Math.min(1, x)); }
+function ppSmoothstep(x) { x = ppClamp01(x); return x * x * (3 - 2 * x); }
+
+// Phases (fractions of the whole animation):
+//   0 .. PP_IDLE           printer stationary, no paper yet
+//   PP_IDLE .. +printLen   paper emerges (eased - no jumps at either end)
+//   rest                   finished print held in its final position
+// Print speed scales printLen: 2x prints in half the time and holds the
+// finished photo longer; 0.5x stretches the print across nearly the
+// whole animation. The photo "develops" (fades/saturates in) alongside
+// the paper movement and always finishes by p = 0.98.
+const PP_IDLE = 0.1;
+function photoPrintTiming(p, speed) {
+  const printLen = Math.min(0.86, Math.max(0.25, 0.62 / speed));
+  const raw = ppClamp01((p - PP_IDLE) / printLen);
+  const emerge = 0.5 - 0.5 * Math.cos(Math.PI * raw); // ease-in-out
+  const devStart = PP_IDLE + printLen * 0.05;
+  const devLen = Math.min(printLen * 1.05, 0.98 - devStart);
+  const develop = ppSmoothstep((p - devStart) / devLen);
+  return { raw, emerge, develop, printing: raw > 0 && raw < 1, done: raw >= 1 };
+}
+
+// Paper follows the photo's orientation (portrait photo -> portrait
+// 100x148 postcard, landscape -> landscape), so a photo is never forced
+// into a badly cropped shape. Printer size is then fitted so the fully
+// printed paper plus printer fit the chosen output format.
+const PP_STYLES = {
+  selphy: {
+    paperRatio: 0.74, bodyRatio: 0.36, topRatio: 0.12, radius: 0.07,
+    faceTop: "#2e3035", faceBottom: "#141518", topBack: "#43464c", topFront: "#2c2e33",
+    edge: "rgba(255,255,255,0.20)", slot: "#050506", trim: "#1c1d21"
+  },
+  generic: {
+    paperRatio: 0.76, bodyRatio: 0.40, topRatio: 0.13, radius: 0.035,
+    faceTop: "#e7e4de", faceBottom: "#bdb9b2", topBack: "#f3f1ed", topFront: "#dedbd5",
+    edge: "rgba(255,255,255,0.85)", slot: "#141416", trim: "#cfcbc4"
+  }
+};
+const PP_FINAL_OUT = 0.965; // fraction of the paper that ends up outside the slot
+
+function photoPrintGeometry(w, h, image, style) {
+  const s = PP_STYLES[style] || PP_STYLES.selphy;
+  const landscape = image ? image.width > image.height : false;
+  const pa = landscape ? 100 / 148 : 148 / 100; // paper height / width
+  const PW = Math.min(w * 0.84, (h * 0.84) / (s.paperRatio * pa * PP_FINAL_OUT + s.bodyRatio + s.topRatio));
+  const pw = PW * s.paperRatio;
+  const ph = pw * pa;
+  const bodyH = PW * s.bodyRatio;
+  const topD = PW * s.topRatio;
+  const total = ph * PP_FINAL_OUT + topD * 0.55 + bodyH;
+  const paperTopFinal = (h - total) / 2 + h * 0.015;
+  const slotY = paperTopFinal + ph * PP_FINAL_OUT;
+  const yT = slotY - topD * 0.45;
+  const yF = yT + topD;
+  const base = yF + bodyH;
+  const slitH = Math.max(4, topD * 0.22);
+  return { cx: w / 2, PW, pw, ph, bodyH, topD, slotY, yT, yF, base, slitH, s, landscape };
+}
+
+function ppRoundRect(c, x, y, w, h, r) {
+  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+  c.beginPath();
+  c.moveTo(x + rr, y);
+  c.lineTo(x + w - rr, y);
+  c.quadraticCurveTo(x + w, y, x + w, y + rr);
+  c.lineTo(x + w, y + h - rr);
+  c.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+  c.lineTo(x + rr, y + h);
+  c.quadraticCurveTo(x, y + h, x, y + h - rr);
+  c.lineTo(x, y + rr);
+  c.quadraticCurveTo(x, y, x + rr, y);
+  c.closePath();
+}
+
+function ppDrawBackground(c, g, w, h) {
+  const horizon = g.yF + g.bodyH * 0.12;
+  // Wall
+  const wall = c.createLinearGradient(0, 0, 0, horizon);
+  wall.addColorStop(0, "#d9d4cd");
+  wall.addColorStop(1, "#c2bbb2");
+  c.fillStyle = wall;
+  c.fillRect(0, 0, w, horizon);
+  // Tabletop - darker towards the back edge, lighter towards the viewer
+  const table = c.createLinearGradient(0, horizon, 0, h);
+  table.addColorStop(0, "#a3998d");
+  table.addColorStop(0.35, "#b8afa4");
+  table.addColorStop(1, "#cbc3b9");
+  c.fillStyle = table;
+  c.fillRect(0, horizon, w, h - horizon);
+  // Soft line where table meets wall
+  const edge = c.createLinearGradient(0, horizon - 6, 0, horizon + 10);
+  edge.addColorStop(0, "rgba(0,0,0,0)");
+  edge.addColorStop(0.4, "rgba(0,0,0,0.10)");
+  edge.addColorStop(1, "rgba(0,0,0,0)");
+  c.fillStyle = edge;
+  c.fillRect(0, horizon - 6, w, 16);
+  // Warm pool of light around the printer
+  const pool = c.createRadialGradient(g.cx - g.PW * 0.15, g.yT, 0, g.cx, g.yT, Math.max(w, h) * 0.7);
+  pool.addColorStop(0, "rgba(255,248,236,0.30)");
+  pool.addColorStop(1, "rgba(255,248,236,0)");
+  c.fillStyle = pool;
+  c.fillRect(0, 0, w, h);
+  // Vignette
+  const vig = c.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.hypot(w, h) * 0.62);
+  vig.addColorStop(0, "rgba(0,0,0,0)");
+  vig.addColorStop(1, "rgba(0,0,0,0.30)");
+  c.fillStyle = vig;
+  c.fillRect(0, 0, w, h);
+}
+
+function ppDrawContactShadow(c, g) {
+  c.save();
+  c.translate(g.cx + g.PW * 0.03, g.base);
+  c.scale(1, 0.16);
+  const r = g.PW * 0.62;
+  const sh = c.createRadialGradient(0, 0, r * 0.55, 0, 0, r);
+  sh.addColorStop(0, "rgba(0,0,0,0.45)");
+  sh.addColorStop(1, "rgba(0,0,0,0)");
+  c.fillStyle = sh;
+  c.beginPath();
+  c.arc(0, 0, r, 0, Math.PI * 2);
+  c.fill();
+  c.restore();
+  // Tight occlusion shadow right under the body
+  const tight = c.createLinearGradient(0, g.base - 2, 0, g.base + g.bodyH * 0.08);
+  tight.addColorStop(0, "rgba(0,0,0,0.45)");
+  tight.addColorStop(1, "rgba(0,0,0,0)");
+  c.fillStyle = tight;
+  c.fillRect(g.cx - g.PW * 0.49, g.base - 2, g.PW * 0.98, g.bodyH * 0.08 + 2);
+}
+
+// Top surface - drawn as a slight trapezoid (narrower at the back) to
+// read as a surface seen from slightly above.
+function ppDrawTopSurface(c, g) {
+  const s = g.s;
+  const inset = g.PW * 0.025;
+  const x0 = g.cx - g.PW / 2, x1 = g.cx + g.PW / 2;
+  const r = g.PW * s.radius * 0.6;
+  c.beginPath();
+  c.moveTo(x0 + inset + r, g.yT);
+  c.lineTo(x1 - inset - r, g.yT);
+  c.quadraticCurveTo(x1 - inset, g.yT, x1 - inset * 0.5, g.yT + r * 0.6);
+  c.lineTo(x1, g.yF);
+  c.lineTo(x0, g.yF);
+  c.lineTo(x0 + inset * 0.5, g.yT + r * 0.6);
+  c.quadraticCurveTo(x0 + inset, g.yT, x0 + inset + r, g.yT);
+  c.closePath();
+  const grad = c.createLinearGradient(0, g.yT, 0, g.yF);
+  grad.addColorStop(0, s.topBack);
+  grad.addColorStop(1, s.topFront);
+  c.fillStyle = grad;
+  c.fill();
+  // Back-edge highlight
+  c.strokeStyle = s.edge;
+  c.lineWidth = Math.max(1, g.PW * 0.002);
+  c.beginPath();
+  c.moveTo(x0 + inset + r, g.yT + 0.5);
+  c.lineTo(x1 - inset - r, g.yT + 0.5);
+  c.stroke();
+}
+
+// The dark slit the paper comes out of (only its back half stays
+// visible - the front lip drawn later covers the rest).
+function ppDrawSlot(c, g) {
+  const sw = g.pw * 1.06;
+  const x = g.cx - sw / 2;
+  const y = g.slotY - g.slitH / 2;
+  const grad = c.createLinearGradient(0, y, 0, y + g.slitH);
+  grad.addColorStop(0, g.s.slot);
+  grad.addColorStop(1, "#000");
+  c.fillStyle = grad;
+  ppRoundRect(c, x, y, sw, g.slitH, g.slitH * 0.45);
+  c.fill();
+}
+
+// Front lip of the slot - drawn *after* the paper and overlapping its
+// bottom edge, so the paper reads as coming out from behind/under it.
+function ppDrawSlotLip(c, g) {
+  const s = g.s;
+  const sw = g.pw * 1.06 + g.slitH;
+  const x = g.cx - sw / 2;
+  const y = g.slotY - g.slitH * 0.1;
+  const lipH = g.slitH * 0.7;
+  const grad = c.createLinearGradient(0, y, 0, y + lipH);
+  grad.addColorStop(0, s.topBack);
+  grad.addColorStop(1, s.topFront);
+  c.fillStyle = grad;
+  ppRoundRect(c, x, y, sw, lipH, lipH * 0.4);
+  c.fill();
+  c.strokeStyle = s.edge;
+  c.lineWidth = Math.max(1, g.PW * 0.0025);
+  c.beginPath();
+  c.moveTo(x + lipH * 0.4, y + 0.5);
+  c.lineTo(x + sw - lipH * 0.4, y + 0.5);
+  c.stroke();
+}
+
+function ppDrawPaper(c, g, timing, image) {
+  const emerged = timing.emerge * g.ph * PP_FINAL_OUT;
+  if (emerged < 0.5) return;
+  const clipBottom = g.slotY + g.slitH * 0.15;
+  const px = g.cx - g.pw / 2;
+  const py = clipBottom - emerged;
+
+  c.save();
+  // Only the part of the paper above the slot mouth exists on screen -
+  // the rest is still inside the printer.
+  c.beginPath();
+  c.rect(0, 0, canvas.width, clipBottom);
+  c.clip();
+
+  // Paper with a soft shadow on the wall/top surface behind it
+  c.save();
+  c.shadowColor = "rgba(0,0,0,0.28)";
+  c.shadowBlur = g.pw * 0.05;
+  c.shadowOffsetX = g.pw * 0.018;
+  c.shadowOffsetY = g.pw * 0.012;
+  c.fillStyle = "#f7f6f2";
+  ppRoundRect(c, px, py, g.pw, g.ph, Math.max(1, g.pw * 0.006));
+  c.fill();
+  c.restore();
+
+  // Photo, moving with the paper
+  if (image) {
+    const m = photoPrint.border ? g.pw * 0.05 : 0;
+    const ax = px + m, ay = py + m, aw = g.pw - m * 2, ah = g.ph - m * 2;
+    c.save();
+    c.beginPath();
+    c.rect(ax, ay, aw, ah);
+    c.clip();
+    const cover = Math.max(aw / image.width, ah / image.height) * photoPrint.scale;
+    const dw = image.width * cover, dh = image.height * cover;
+    const d = timing.develop;
+    c.globalAlpha = 0.06 + 0.94 * d;
+    c.filter = `saturate(${(0.2 + 0.8 * d).toFixed(3)}) contrast(${(0.82 + 0.18 * d).toFixed(3)}) brightness(${(1.14 - 0.14 * d).toFixed(3)})`;
+    c.drawImage(image, ax + (aw - dw) / 2, ay + (ah - dh) / 2, dw, dh);
+    c.restore();
+  }
+
+  // Gentle gloss sweep that travels down the paper as it moves
+  c.save();
+  ppRoundRect(c, px, py, g.pw, g.ph, Math.max(1, g.pw * 0.006));
+  c.clip();
+  const sweepY = py + g.ph * (1.2 - timing.emerge * 1.6);
+  const gloss = c.createLinearGradient(px, sweepY - g.pw * 0.5, px + g.pw, sweepY + g.pw * 0.5);
+  gloss.addColorStop(0, "rgba(255,255,255,0)");
+  gloss.addColorStop(0.5, "rgba(255,255,255,0.13)");
+  gloss.addColorStop(1, "rgba(255,255,255,0)");
+  c.fillStyle = gloss;
+  c.fillRect(px, py, g.pw, g.ph);
+  // Shade where the paper is still close to the dark slot
+  const shadeH = Math.min(emerged, g.ph * 0.07);
+  const shade = c.createLinearGradient(0, clipBottom, 0, clipBottom - shadeH);
+  shade.addColorStop(0, "rgba(0,0,0,0.38)");
+  shade.addColorStop(1, "rgba(0,0,0,0)");
+  c.fillStyle = shade;
+  c.fillRect(px, clipBottom - shadeH, g.pw, shadeH);
+  c.restore();
+
+  c.restore();
+}
+
+function ppDrawFrontFace(c, g) {
+  const s = g.s;
+  const x = g.cx - g.PW / 2;
+  const r = g.PW * s.radius;
+  // Body
+  c.save();
+  c.beginPath();
+  c.moveTo(x, g.yF);
+  c.lineTo(x + g.PW, g.yF);
+  c.lineTo(x + g.PW, g.base - r);
+  c.quadraticCurveTo(x + g.PW, g.base, x + g.PW - r, g.base);
+  c.lineTo(x + r, g.base);
+  c.quadraticCurveTo(x, g.base, x, g.base - r);
+  c.closePath();
+  const face = c.createLinearGradient(0, g.yF, 0, g.base);
+  face.addColorStop(0, s.faceTop);
+  face.addColorStop(1, s.faceBottom);
+  c.fillStyle = face;
+  c.fill();
+  c.clip();
+  // Rounded-edge shading left/right
+  const sides = c.createLinearGradient(x, 0, x + g.PW, 0);
+  sides.addColorStop(0, "rgba(0,0,0,0.28)");
+  sides.addColorStop(0.12, "rgba(0,0,0,0)");
+  sides.addColorStop(0.85, "rgba(0,0,0,0)");
+  sides.addColorStop(1, "rgba(0,0,0,0.34)");
+  c.fillStyle = sides;
+  c.fillRect(x, g.yF, g.PW, g.bodyH);
+  // Soft diagonal sheen
+  const sheen = c.createLinearGradient(x, g.yF, x + g.PW * 0.6, g.base);
+  sheen.addColorStop(0, "rgba(255,255,255,0.07)");
+  sheen.addColorStop(0.5, "rgba(255,255,255,0)");
+  c.fillStyle = sheen;
+  c.fillRect(x, g.yF, g.PW, g.bodyH);
+  c.restore();
+  // Bevel highlight where the top meets the front
+  c.strokeStyle = s.edge;
+  c.lineWidth = Math.max(1, g.PW * 0.003);
+  c.beginPath();
+  c.moveTo(x + 2, g.yF + 1);
+  c.lineTo(x + g.PW - 2, g.yF + 1);
+  c.stroke();
+}
+
+function ppDrawSelphyDetails(c, g, timing) {
+  const s = g.s;
+  const x = g.cx - g.PW / 2;
+  // Paper cassette in the lower front
+  const cx0 = x + g.PW * 0.07, cw = g.PW * 0.86;
+  const cy0 = g.yF + g.bodyH * 0.58, ch = g.bodyH * 0.27;
+  ppRoundRect(c, cx0, cy0, cw, ch, ch * 0.18);
+  const cas = c.createLinearGradient(0, cy0, 0, cy0 + ch);
+  cas.addColorStop(0, "#101114");
+  cas.addColorStop(1, "#1d1e22");
+  c.fillStyle = cas;
+  c.fill();
+  c.strokeStyle = "rgba(255,255,255,0.07)";
+  c.lineWidth = Math.max(1, g.PW * 0.002);
+  c.stroke();
+  // Finger notch
+  ppRoundRect(c, g.cx - g.PW * 0.07, cy0 + ch * 0.32, g.PW * 0.14, ch * 0.36, ch * 0.18);
+  c.fillStyle = "#08090a";
+  c.fill();
+
+  // Display panel (shows print progress)
+  const dw = g.PW * 0.24, dh = g.bodyH * 0.26;
+  const dx = g.cx + g.PW * 0.14, dy = g.yF + g.bodyH * 0.15;
+  ppRoundRect(c, dx - 3, dy - 3, dw + 6, dh + 6, dh * 0.16);
+  c.fillStyle = s.trim;
+  c.fill();
+  ppRoundRect(c, dx, dy, dw, dh, dh * 0.12);
+  const glass = c.createLinearGradient(dx, dy, dx, dy + dh);
+  glass.addColorStop(0, "#16232a");
+  glass.addColorStop(1, "#0a1014");
+  c.fillStyle = glass;
+  c.fill();
+  // Screen content
+  const glow = timing.printing || timing.done ? 1 : 0.45;
+  c.fillStyle = `rgba(150,205,225,${0.55 * glow})`;
+  const ix = dx + dw * 0.1, iy = dy + dh * 0.22, iw = dw * 0.22, ih = dh * 0.5;
+  ppRoundRect(c, ix, iy, iw, ih, ih * 0.1);
+  c.fill();
+  const bx = dx + dw * 0.4, by = dy + dh * 0.55, bw = dw * 0.5, bh = Math.max(2, dh * 0.1);
+  c.fillStyle = "rgba(150,205,225,0.18)";
+  c.fillRect(bx, by, bw, bh);
+  c.fillStyle = "rgba(170,225,240,0.85)";
+  c.fillRect(bx, by, bw * timing.raw, bh);
+  // Screen reflection
+  const refl = c.createLinearGradient(dx, dy, dx + dw, dy + dh);
+  refl.addColorStop(0, "rgba(255,255,255,0.10)");
+  refl.addColorStop(0.45, "rgba(255,255,255,0.02)");
+  refl.addColorStop(0.46, "rgba(255,255,255,0)");
+  c.fillStyle = refl;
+  ppRoundRect(c, dx, dy, dw, dh, dh * 0.12);
+  c.fill();
+
+  // Buttons
+  const br = g.PW * 0.017;
+  const by0 = g.yF + g.bodyH * 0.28;
+  for (let i = 0; i < 4; i++) {
+    const bxc = x + g.PW * 0.12 + i * g.PW * 0.075;
+    const bg = c.createRadialGradient(bxc - br * 0.3, by0 - br * 0.3, br * 0.1, bxc, by0, br);
+    bg.addColorStop(0, "#4a4d53");
+    bg.addColorStop(1, "#1f2024");
+    c.fillStyle = bg;
+    c.beginPath();
+    c.arc(bxc, by0, br, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = "rgba(0,0,0,0.55)";
+    c.lineWidth = Math.max(1, br * 0.15);
+    c.stroke();
+  }
+  ppDrawLed(c, x + g.PW * 0.12 + 4 * g.PW * 0.075, by0, br * 0.42, timing);
+}
+
+function ppDrawGenericDetails(c, g, timing) {
+  const x = g.cx - g.PW / 2;
+  // Horizontal seam and slim front tray
+  c.strokeStyle = "rgba(0,0,0,0.12)";
+  c.lineWidth = Math.max(1, g.PW * 0.002);
+  c.beginPath();
+  c.moveTo(x + g.PW * 0.04, g.yF + g.bodyH * 0.62);
+  c.lineTo(x + g.PW * 0.96, g.yF + g.bodyH * 0.62);
+  c.stroke();
+  ppRoundRect(c, g.cx - g.PW * 0.3, g.yF + g.bodyH * 0.7, g.PW * 0.6, g.bodyH * 0.1, g.bodyH * 0.05);
+  c.fillStyle = "rgba(0,0,0,0.10)";
+  c.fill();
+  // Single power button + status LED
+  const br = g.PW * 0.026;
+  const bxc = x + g.PW * 0.86, byc = g.yF + g.bodyH * 0.3;
+  const bg = c.createRadialGradient(bxc - br * 0.3, byc - br * 0.3, br * 0.1, bxc, byc, br);
+  bg.addColorStop(0, "#fbfaf8");
+  bg.addColorStop(1, "#c9c5be");
+  c.fillStyle = bg;
+  c.beginPath();
+  c.arc(bxc, byc, br, 0, Math.PI * 2);
+  c.fill();
+  c.strokeStyle = "rgba(0,0,0,0.18)";
+  c.lineWidth = Math.max(1, br * 0.1);
+  c.stroke();
+  ppDrawLed(c, x + g.PW * 0.78, byc, br * 0.3, timing);
+}
+
+// Status LED: dim when idle, pulsing while printing, steady when done.
+// Pulse is derived from print progress (not wall-clock time), so it's
+// identical in preview and export.
+function ppDrawLed(c, x, y, r, timing) {
+  let a = 0.35;
+  if (timing.printing) a = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(timing.raw * Math.PI * 2 * 5));
+  else if (timing.done) a = 1;
+  const glow = c.createRadialGradient(x, y, 0, x, y, r * 4);
+  glow.addColorStop(0, `rgba(120,230,150,${0.45 * a})`);
+  glow.addColorStop(1, "rgba(120,230,150,0)");
+  c.fillStyle = glow;
+  c.beginPath();
+  c.arc(x, y, r * 4, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = `rgba(150,245,175,${0.3 + 0.7 * a})`;
+  c.beginPath();
+  c.arc(x, y, r, 0, Math.PI * 2);
+  c.fill();
+}
+
+function drawPhotoPrintScene(p) {
+  const w = canvas.width, h = canvas.height;
+  const g = photoPrintGeometry(w, h, photoPrint.image, photoPrint.printer);
+  const timing = photoPrintTiming(ppClamp01(p), photoPrint.speed);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.filter = "none";
+  ppDrawBackground(ctx, g, w, h);
+  ppDrawContactShadow(ctx, g);
+  ppDrawTopSurface(ctx, g);
+  ppDrawSlot(ctx, g);
+  if (photoPrint.image) ppDrawPaper(ctx, g, timing, photoPrint.image);
+  ppDrawSlotLip(ctx, g);
+  ppDrawFrontFace(ctx, g);
+  if (photoPrint.printer === "generic") ppDrawGenericDetails(ctx, g, timing);
+  else ppDrawSelphyDetails(ctx, g, timing);
+  ctx.restore();
+}
+
+// --- Photo upload ---
+const photoPrintNameEl = document.getElementById("photoPrintName");
+function setPhotoPrintName(msg, isError) {
+  photoPrintNameEl.textContent = msg;
+  photoPrintNameEl.classList.toggle("error", !!isError);
+}
+
+function loadPhotoPrintFile(file) {
+  const okType = /^image\/(jpeg|png|webp)$/i.test(file.type) || (!file.type && /\.(jpe?g|png|webp)$/i.test(file.name));
+  if (!okType) {
+    setPhotoPrintName(`${file.name} isn't a JPEG, PNG or WebP image — please choose one of those.`, true);
+    return;
+  }
+  const token = ++photoPrint.loadToken;
+  setPhotoPrintName(`Loading ${file.name}...`, false);
+  let url;
+  try {
+    url = URL.createObjectURL(file);
+  } catch (err) {
+    setPhotoPrintName(`Couldn't read ${file.name}: ${err.message}`, true);
+    return;
+  }
+  const img = new Image();
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    if (token !== photoPrint.loadToken) return; // a newer pick superseded this one
+    if (!img.naturalWidth || !img.naturalHeight) {
+      setPhotoPrintName(`Couldn't load ${file.name} — the image has no size.`, true);
+      return;
+    }
+    // Work from a downscaled copy (max 2400px edge): plenty for a 1920px
+    // output, and keeps per-frame drawing fast with very large photos.
+    const scale = Math.min(1, 2400 / Math.max(img.naturalWidth, img.naturalHeight));
+    const work = document.createElement("canvas");
+    work.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    work.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    work.getContext("2d").drawImage(img, 0, 0, work.width, work.height);
+    photoPrint.image = work;
+    photoPrint.fileName = file.name;
+    setPhotoPrintName(`${file.name} (${img.naturalWidth}×${img.naturalHeight})`, false);
+    // Show the finished print as a still; Play restarts from the beginning.
+    if (photoPrint.playing) pausePhotoPrint();
+    photoPrint.progress = 1;
+    if (isPhotoPrint()) {
+      drawFrame();
+      playBtn.disabled = photoPrint.exporting;
+      updateExportAvailability();
+      setStatus("");
+    }
+  };
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    if (token !== photoPrint.loadToken) return;
+    setPhotoPrintName(`Couldn't load ${file.name} — the file may be damaged or isn't a supported image.`, true);
+  };
+  img.src = url;
+}
+
+document.getElementById("photoPrintFile").addEventListener("change", e => {
+  if (e.target.files && e.target.files[0]) loadPhotoPrintFile(e.target.files[0]);
+  else setStatus("No file detected from picker — try again.");
+});
+
+// --- Photo animation preview ---
+function photoPrintCurrentProgress(now = performance.now()) {
+  if (!photoPrint.playing) return photoPrint.progress;
+  return Math.min(1, photoPrint.baseProgress + (now - photoPrint.startTime) / 1000 / photoPrint.duration);
+}
+function photoPrintLoop() {
+  if (!photoPrint.playing) return;
+  photoPrint.progress = photoPrintCurrentProgress();
+  drawFrame();
+  if (photoPrint.progress >= 1) {
+    photoPrint.playing = false;
+    playBtn.textContent = "Play";
+    return;
+  }
+  photoPrint.rafId = requestAnimationFrame(photoPrintLoop);
+}
+function playPhotoPrint() {
+  if (!photoPrint.image) return;
+  if (photoPrint.progress >= 1) photoPrint.progress = 0; // restart after completion
+  photoPrint.baseProgress = photoPrint.progress;
+  photoPrint.startTime = performance.now();
+  photoPrint.playing = true;
+  playBtn.textContent = "Pause";
+  photoPrintLoop();
+}
+function pausePhotoPrint() {
+  photoPrint.progress = photoPrintCurrentProgress();
+  photoPrint.playing = false;
+  cancelAnimationFrame(photoPrint.rafId);
+  playBtn.textContent = "Play";
+  if (isPhotoPrint()) drawFrame();
+}
+function togglePhotoPrintPlayback() {
+  if (photoPrint.exporting) return;
+  if (photoPrint.playing) pausePhotoPrint();
+  else playPhotoPrint();
+}
+
+// Stops whichever preview is running - used when switching into or out
+// of the photo animation so the two loops never run at once.
+function stopAllPreviews() {
+  if (photoPrint.playing) pausePhotoPrint();
+  if (playing) {
+    playing = false;
+    playBtn.textContent = "Play";
+    for (const slot of getActiveSlots()) if (slot.video) slot.video.pause();
+    stopAudioPreview();
+    cancelAnimationFrame(rafId);
+  }
+}
+
+// --- Photo animation controls ---
+function redrawPhotoPrintIfVisible() {
+  if (isPhotoPrint() && !photoPrint.playing) drawFrame();
+}
+
+document.getElementById("photoPrintDuration").addEventListener("input", e => {
+  const v = parseFloat(e.target.value);
+  if (Number.isNaN(v)) return;
+  // Rebase so changing duration mid-play continues from the same point.
+  if (photoPrint.playing) {
+    photoPrint.progress = photoPrintCurrentProgress();
+    photoPrint.baseProgress = photoPrint.progress;
+    photoPrint.startTime = performance.now();
+  }
+  photoPrint.duration = Math.max(4, Math.min(12, v));
+  document.getElementById("photoPrintDurationValue").textContent = photoPrint.duration.toFixed(1) + "s";
+});
+document.getElementById("photoPrintSpeed").addEventListener("input", e => {
+  const v = parseFloat(e.target.value);
+  if (Number.isNaN(v)) return;
+  photoPrint.speed = Math.max(0.5, Math.min(2, v));
+  document.getElementById("photoPrintSpeedValue").textContent = photoPrint.speed.toFixed(2) + "×";
+  redrawPhotoPrintIfVisible();
+});
+document.getElementById("photoPrintScale").addEventListener("input", e => {
+  const v = parseFloat(e.target.value);
+  if (Number.isNaN(v)) return;
+  photoPrint.scale = Math.max(0.7, Math.min(1.3, v / 100));
+  document.getElementById("photoPrintScaleValue").textContent = Math.round(photoPrint.scale * 100) + "%";
+  redrawPhotoPrintIfVisible();
+});
+document.getElementById("photoPrintBorder").addEventListener("change", e => {
+  photoPrint.border = e.target.checked;
+  redrawPhotoPrintIfVisible();
+});
+document.querySelectorAll('input[name="photoPrintPrinter"]').forEach(radio => {
+  radio.addEventListener("change", () => {
+    if (!radio.checked) return;
+    photoPrint.printer = radio.value;
+    redrawPhotoPrintIfVisible();
+  });
+});
+document.querySelectorAll('input[name="photoPrintFormat"]').forEach(radio => {
+  radio.addEventListener("change", () => {
+    if (!radio.checked) return;
+    photoPrint.format = radio.value;
+    if (isPhotoPrint()) applyPhotoPrintLayout();
+  });
+});
+
+// Locks every input that could change the canvas or animation while an
+// export is running (aspect/mode radios included).
+function setPhotoPrintInputsDisabled(disabled) {
+  document.querySelectorAll('#photoPrintControls input, input[name="aspectRatio"]').forEach(el => { el.disabled = disabled; });
+}
+
+// --- Photo animation export (WebCodecs + mp4-muxer, video only) ---
+async function exportPhotoPrint() {
+  if (!photoPrint.image || photoPrint.exporting) return;
+  if (photoPrint.playing) pausePhotoPrint();
+
+  if (typeof VideoEncoder === "undefined") {
+    setStatus("This browser doesn't support the encoder needed for export. Try Chrome or Edge.");
+    return;
+  }
+  if (/Firefox/i.test(navigator.userAgent)) {
+    setStatus("Export isn't fully supported in Firefox yet (missing video metadata that Chrome/Edge provide) — please use Chrome or Edge to export.");
+    return;
+  }
+
+  photoPrint.exporting = true;
+  setPhotoPrintInputsDisabled(true);
+  exportBtn.disabled = true;
+  playBtn.disabled = true;
+  progressWrap.classList.add("active");
+  progressBar.style.width = "0%";
+  setStatus("Loading export library...");
+
+  const fps = 30;
+  const frameCount = Math.max(2, Math.round(photoPrint.duration * fps));
+  let encoder = null;
+  try {
+    const lib = await getMuxerLib();
+
+    setStatus("Checking video encoder...");
+    drawPhotoPrintScene(0);
+    const encoderConfig = await chooseVideoEncoderConfig(W, H, fps);
+    if (!encoderConfig) throw new Error("no working H.264 encoder was found in this browser — please try Chrome or Edge.");
+
+    const muxer = new lib.Muxer({
+      target: new lib.ArrayBufferTarget(),
+      video: { codec: "avc", width: W, height: H },
+      fastStart: "in-memory"
+    });
+    let encodeError = null;
+    encoder = new VideoEncoder({
+      output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+      error: (e) => { console.error(e); encodeError = e; }
+    });
+    encoder.configure(encoderConfig);
+
+    for (let i = 0; i < frameCount; i++) {
+      if (encodeError) throw encodeError;
+      // Same progress -> drawing function the preview uses; the last
+      // frame lands exactly on p = 1 (the finished print).
+      drawPhotoPrintScene(i / (frameCount - 1));
+      const frame = new VideoFrame(canvas, {
+        timestamp: Math.round((i * 1_000_000) / fps),
+        duration: Math.round(1_000_000 / fps)
+      });
+      encoder.encode(frame, { keyFrame: i % (fps * 2) === 0 });
+      frame.close();
+
+      const pct = Math.round(((i + 1) / frameCount) * 100);
+      progressBar.style.width = pct + "%";
+      setStatus(`Encoding frame ${i + 1} / ${frameCount}`);
+
+      // Drawing is much faster than encoding here (no video seeks), so
+      // keep the encoder's queue short instead of buffering every frame.
+      while (encoder.encodeQueueSize > 4) await new Promise(r => setTimeout(r, 4));
+      if (i % 4 === 0) await new Promise(r => setTimeout(r, 0));
+    }
+
+    setStatus("Finalizing file...");
+    await encoder.flush();
+    if (encodeError) throw encodeError;
+    muxer.finalize();
+
+    const blob = new Blob([muxer.target.buffer], { type: "video/mp4" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "photo-print-animation.mp4";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+
+    setStatus(`Done — photo-print-animation.mp4 downloaded (${W}×${H}, ${(frameCount / fps).toFixed(1)}s at 30 fps).`);
+  } catch (err) {
+    console.error(err);
+    const msg = (err && err.message) || String(err);
+    if (/decoderConfig|colorSpace/i.test(msg)) {
+      setStatus("Export failed: this browser's video encoder is missing metadata this tool needs — please use Chrome or Edge to export.");
+    } else if (/import|fetch|module/i.test(msg)) {
+      setStatus("Couldn't load the export library (check your internet connection) — try again.");
+    } else {
+      setStatus("Export failed: " + msg);
+    }
+  } finally {
+    if (encoder && encoder.state !== "closed") {
+      try { encoder.close(); } catch (err) { /* already closed */ }
+    }
+    photoPrint.exporting = false;
+    setPhotoPrintInputsDisabled(false);
+    progressWrap.classList.remove("active");
+    setTimeout(() => progressBar.style.width = "0%", 600);
+    if (isPhotoPrint()) {
+      playBtn.disabled = !photoPrint.image;
+      updateExportAvailability();
+      drawFrame();
+    }
+  }
+}
 
 // Mixes together whichever audio sources are active - the background
 // music track (already fade+level-rendered into audioState.renderedBuffer)
@@ -2107,6 +3004,7 @@ async function chooseVideoEncoderConfig(width, height, fps) {
 
 // --- Export (frame-accurate, seek-driven, via WebCodecs + mp4-muxer) ---
 exportBtn.addEventListener("click", async () => {
+  if (isPhotoPrint()) { exportPhotoPrint(); return; }
   if (!allActiveReady()) return;
   if (playing) { playBtn.click(); }
 
