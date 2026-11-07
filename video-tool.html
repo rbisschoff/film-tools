@@ -888,14 +888,16 @@
     </div>
     <div class="photo-print-group-label">Printer appearance</div>
     <div class="output-mode-row">
+      <label><input type="radio" name="photoPrintPrinter" value="photo" checked> Photographic white printer (real photo)</label>
       <label><input type="radio" name="photoPrintPrinter" value="instax"> Instax Link-inspired handheld</label>
       <label><input type="radio" name="photoPrintPrinter" value="qx20"> SELPHY QX20-inspired compact</label>
       <label><input type="radio" name="photoPrintPrinter" value="generic"> Generic compact printer</label>
-      <label><input type="radio" name="photoPrintPrinter" value="selphy" checked> Classic desktop (SELPHY-inspired)</label>
+      <label><input type="radio" name="photoPrintPrinter" value="selphy"> Classic desktop (SELPHY-inspired)</label>
     </div>
     <div class="photo-print-group-label">Background</div>
     <div class="output-mode-row">
-      <label><input type="radio" name="photoPrintBackground" value="beach" checked> Thailand beach (photo)</label>
+      <label><input type="radio" name="photoPrintBackground" value="terrace" checked> Bali terrace (photo)</label>
+      <label><input type="radio" name="photoPrintBackground" value="beach"> Thailand beach (photo)</label>
       <label><input type="radio" name="photoPrintBackground" value="balcony"> Tropical balcony (photo)</label>
       <label><input type="radio" name="photoPrintBackground" value="bedroom"> Bedroom (photo)</label>
       <label><input type="radio" name="photoPrintBackground" value="studio"> Studio tabletop</label>
@@ -1035,8 +1037,9 @@ let layoutMode = "standard";
 let stackDividerColor = "none";
 
 // Photo Printing Animation - a standalone mode (layoutMode
-// "photo-print") that renders a programmatically drawn compact photo
-// printer printing the uploaded photo. It uses no video slots and no
+// "photo-print") that renders a compact photo printer printing the
+// uploaded photo - by default a photographic scene built from real
+// photos (see PP_V3C), or one of the drawn printers. It uses no video slots and no
 // audio: getActiveSlotNames() returns [] in this mode so nothing that
 // iterates the video slots can pick them up. Declared up here (before
 // the first applyAspectRatio() call below) so nothing can hit it in its
@@ -1054,9 +1057,9 @@ const photoPrint = {
   speed: 1,             // 0.5-2
   scale: 1,             // 0.7-1.3
   border: true,
-  printer: "selphy",    // "instax" | "qx20" | "generic" | "selphy" (classic desktop - the default,
-                        // a flat desktop printer that keeps the print the dominant subject)
-  background: "beach",  // "beach" | "balcony" | "bedroom" | "studio"
+  printer: "photo",     // "photo" (the default: a real photographed printer, table and terrace -
+                        // see PP_V3C) | "instax" | "qx20" | "generic" | "selphy" (drawn printers)
+  background: "terrace", // "terrace" | "beach" | "balcony" | "bedroom" | "studio"
   format: "9:16",
   progress: 1,          // 0..1 - the single value preview and export both draw from
                         // (starts on the finished print, showing the sample photo)
@@ -1249,6 +1252,7 @@ function applyPhotoPrintLayout() {
   updateLayoutVisibility();
   // Start loading the background photos as soon as this mode is used.
   Object.keys(PP_PHOTO_SCENES).forEach(name => ppEnsurePhoto(name));
+  ppEnsureV3C();
   updatePhotoPrintBgNote();
   drawFrame();
   playBtn.disabled = photoPrint.exporting; // the sample photo can be previewed too
@@ -2471,7 +2475,7 @@ function ppDrawSlotLip(c, g) {
 }
 
 function ppDrawPaper(c, g, timing, image) {
-  const emerged = timing.emerge * g.ph * PP_FINAL_OUT;
+  const emerged = timing.emerge * g.ph * (g.finalOut || PP_FINAL_OUT);
   if (emerged < 0.5) return;
   const clipBottom = g.slotY + g.slitH * 0.15;
   const px = g.cx - g.pw / 2;
@@ -2505,7 +2509,7 @@ function ppDrawPaper(c, g, timing, image) {
       // the classic wide bottom margin.
       ax = px + g.pw * (4 / 54); ay = py + g.ph * (6.5 / 86); aw = g.pw * (46 / 54); ah = g.ph * (62 / 86);
     } else {
-      const m = g.pw * (g.paperKind === "square" ? 0.06 : 0.05);
+      const m = g.pw * (g.paperKind === "square" ? 0.06 : g.paperKind === "photo" ? 0.035 : 0.05);
       ax = px + m; ay = py + m; aw = g.pw - m * 2; ah = g.ph - m * 2;
     }
     c.save();
@@ -2538,6 +2542,18 @@ function ppDrawPaper(c, g, timing, image) {
   gloss.addColorStop(1, "rgba(255,255,255,0)");
   c.fillStyle = gloss;
   c.fillRect(px, py, g.pw, g.ph);
+  if (g.paperKind === "photo") {
+    // The photographic scene's light falls across the sheet from the right
+    // (as on the real print in the printer photo): slightly darker at the
+    // left edge, a touch at the far right.
+    const fall = c.createLinearGradient(px, 0, px + g.pw, 0);
+    fall.addColorStop(0, "rgba(40,32,24,0.085)");
+    fall.addColorStop(0.45, "rgba(40,32,24,0.012)");
+    fall.addColorStop(0.85, "rgba(40,32,24,0)");
+    fall.addColorStop(1, "rgba(40,32,24,0.04)");
+    c.fillStyle = fall;
+    c.fillRect(px, py, g.pw, g.ph);
+  }
   // Shade where the paper is still close to the dark slot
   const shadeH = Math.min(emerged, g.ph * 0.07);
   const shade = c.createLinearGradient(0, clipBottom, 0, clipBottom - shadeH);
@@ -2766,9 +2782,10 @@ function ppNoise() {
 
 // --- Built-in sample photo ---
 // Shown in the printer until the user picks their own photo, so the
-// photo-first composition is visible straight away. Drawn in code (a
-// tropical sunset over the sea), so there's no extra file or licence -
-// and seeded, so every frame of every preview draws identical pixels.
+// photo-first composition is visible straight away. The sample is a CC0
+// portrait (assets/photo-print/sample-portrait.jpg, see ppPrintImage);
+// this drawn sunset is only the fallback while it loads or if it can't -
+// seeded, so every frame of every preview draws identical pixels.
 // Never exported: export stays disabled until a real photo is chosen.
 let ppSampleCanvas = null;
 function ppSampleImage() {
@@ -2863,7 +2880,11 @@ function ppSampleImage() {
 }
 
 // The photo on the print: the user's, or the sample until they pick one.
-function ppPrintImage() { return photoPrint.image || ppSampleImage(); }
+function ppPrintImage() {
+  if (photoPrint.image) return photoPrint.image;
+  const sample = PP_V3C_ASSETS.sample;
+  return sample && sample.status === "ready" ? sample.img : ppSampleImage();
+}
 
 // Fine material/film grain over whatever is currently clipped.
 function ppGrain(c, x, y, w, h, alpha) {
@@ -4282,13 +4303,24 @@ function ppOnPhotoStateChange() {
 function updatePhotoPrintBgNote() {
   const el = document.getElementById("photoPrintBgNote");
   if (!el) return;
-  const spec = PP_PHOTO_SCENES[photoPrint.background];
-  const st = spec && ppPhotoState[photoPrint.background];
+  if (photoPrint.printer === "photo") {
+    const v = ppV3CStatus();
+    const extra = photoPrint.background !== "terrace" && PP_PHOTO_SCENES[photoPrint.background] ? "; " + PP_PHOTO_SCENES[photoPrint.background].credit : "";
+    el.textContent = v.status === "loading" ? "Loading photographic scene..."
+      : v.status === "error" ? `Photographic scene unavailable: ${v.error}.`
+      : PP_V3C.credit + extra;
+    el.classList.toggle("error", v.status === "error");
+    return;
+  }
+  const bgName = ppDrawnPrinterBackground();
+  const spec = PP_PHOTO_SCENES[bgName];
+  const st = spec && ppPhotoState[bgName];
   let msg = "", isError = false;
+  if (photoPrint.background === "terrace") msg = "The Bali terrace is composed for the photographic printer - showing the Tropical balcony with this printer. ";
   if (spec) {
-    if (!st || st.status === "loading") msg = "Loading background photo...";
-    else if (st.status === "error") { msg = `Background photo unavailable: ${st.error}.`; isError = true; }
-    else msg = spec.credit;
+    if (!st || st.status === "loading") msg += "Loading background photo...";
+    else if (st.status === "error") { msg += `Background photo unavailable: ${st.error}.`; isError = true; }
+    else msg += spec.credit;
   }
   el.textContent = msg;
   el.classList.toggle("error", isError);
@@ -4575,10 +4607,244 @@ function ppEmbedInSurface(c, g, cap, scale) {
   c.drawImage(t, x0, y0);
 }
 
+// ======================================================================
+// Photographic printer scene ("photo" printer - the default)
+// ======================================================================
+// Built from real photographs rather than drawn: a photographed white
+// compact printer, the wooden table it stands on and a Bali terrace
+// behind it (sources and licences: assets/photo-print/CREDITS.md). The
+// layers were prepared once, offline, from the approved "V3C" still -
+// the printer cut out along its own rim, its lettering retouched out,
+// colour-matched to the scene - and are placed here in that still's
+// coordinates: a 1080x1920 "master" frame. Each output format shows the
+// same arrangement scaled by u and anchored to the frame's bottom centre,
+// so the printer is always cropped by the bottom edge exactly as in the
+// 9:16 still; square and landscape frames widen the view of the terrace
+// and table to the sides. Per frame: terrace plate -> table -> printer
+// (behind the slot) -> the print, emerging from the slot -> the printer's
+// front lip over the print's bottom edge -> one shared grade and grain.
+const PP_V3C = {
+  printer: { x: 98, y: 1502, w: 838, h: 467 },        // master px, top-left of the cut-out
+  table: { x: -58, y: 1650.4, w: 1178, h: 363 },     // strip mirrored sideways to fill wide frames
+  lipY: 1607,              // front lip of the paper slot (the print vanishes behind it)
+  slotCX: 542.5,           // centre of the slot
+  pw: 705, ph: 1058,       // 10x15 portrait sheet, white border
+  finalOut: 0.93,          // share of the sheet out of the slot when printing ends
+  // Terrace photo (1280x960): its sea horizon (y 500) sits at master
+  // y 1050, its x 640 at the frame centre, 2.1 master px per photo px,
+  // softened like a lens focused on the print.
+  bg: { cx: 640, horizon: 500, horizonY: 1050, k: 2.1, blur: 7 },
+  printTopMargin: 90,      // square / landscape: room above the finished print (master px)
+  credit: "Photos: printer – Nik (Unsplash); table – pavlovandrew1297 (Pixabay); terrace – qlahr123 (Pixabay); sample portrait – Matt Moloney (StockSnap, CC0)"
+};
+const PP_V3C_SRC = {
+  printer: "assets/photo-print/printer-white-photo.png",
+  table: "assets/photo-print/table-wood.jpg",
+  terrace: "assets/photo-print/terrace-bali.jpg",
+  sample: "assets/photo-print/sample-portrait.jpg"
+};
+const PP_V3C_ASSETS = {}; // key -> { status: "loading" | "ready" | "error", img, error, promise }
+
+function ppEnsureV3CAsset(key) {
+  if (PP_V3C_ASSETS[key]) return PP_V3C_ASSETS[key].promise;
+  const st = { status: "loading" };
+  PP_V3C_ASSETS[key] = st;
+  st.promise = new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        // Same file:// taint check as the scene photos: a tainted canvas
+        // would make export fail later, so find out now.
+        const t = ppMakeCanvas(2, 2).getContext("2d");
+        t.drawImage(img, 0, 0, 2, 2);
+        t.getImageData(0, 0, 1, 1);
+        st.img = img;
+        st.status = "ready";
+      } catch (err) {
+        st.status = "error";
+        st.error = "the photographic scene only works when the page is served over http(s), e.g. GitHub Pages - not opened as a local file";
+      }
+      resolve(st.status === "ready" ? img : null);
+      ppOnPhotoStateChange();
+    };
+    img.onerror = () => {
+      st.status = "error";
+      st.error = `couldn't load ${PP_V3C_SRC[key]}`;
+      resolve(null);
+      ppOnPhotoStateChange();
+    };
+    img.src = PP_V3C_SRC[key];
+  });
+  return st.promise;
+}
+function ppEnsureV3C() {
+  return Promise.all(["printer", "table", "terrace", "sample"].map(ppEnsureV3CAsset));
+}
+// Everything the photographic printer needs for the current background.
+function ppV3CStatus() {
+  const keys = ["printer", "table"];
+  if (photoPrint.background === "terrace") keys.push("terrace");
+  let status = "ready", error = "";
+  for (const k of keys) {
+    const st = PP_V3C_ASSETS[k];
+    if (!st || st.status === "loading") { if (status === "ready") status = "loading"; }
+    else if (st.status === "error") { status = "error"; error = st.error; }
+  }
+  if (photoPrint.background !== "terrace" && PP_PHOTO_SCENES[photoPrint.background]) {
+    const st = ppPhotoState[photoPrint.background];
+    if (!st || st.status === "loading") { if (status === "ready") status = "loading"; }
+    else if (st.status === "error") { status = "error"; error = st.error; }
+  }
+  return { status, error };
+}
+// The Bali terrace is composed for the photographic printer; the drawn
+// printers have no surface mapped in it, so they keep the Tropical balcony.
+function ppDrawnPrinterBackground() {
+  return photoPrint.background === "terrace" ? "balcony" : photoPrint.background;
+}
+
+// Master -> frame scale. 9:16 is the still itself; square and landscape
+// fit the finished print plus a margin into the frame height.
+function ppV3CScale(w, h) {
+  if (h > w * 1.2) return h / 1920;
+  const printTop = PP_V3C.lipY - PP_V3C.ph * PP_V3C.finalOut;
+  return h / (1920 - printTop + PP_V3C.printTopMargin);
+}
+
+// Background plate for the current format: the terrace (or another scene
+// photo / the studio backdrop), lens-blurred once per layout and reused.
+let ppV3CPlate = null;
+function ppV3CBackground(w, h, u) {
+  const bg = photoPrint.background;
+  const key = [bg, w, h, u.toFixed(4)].join("|");
+  if (ppV3CPlate && ppV3CPlate.key === key) return ppV3CPlate.canvas;
+  const c = ppMakeCanvas(w, h);
+  const x = c.getContext("2d");
+  const blur = PP_V3C.bg.blur * u;
+  // Draw onto a padded canvas so the blur has real pixels at the frame
+  // edges instead of fading to transparent.
+  const pad = Math.ceil(blur * 3);
+  const pc = ppMakeCanvas(w + pad * 2, h + pad * 2);
+  const px = pc.getContext("2d");
+  const spec = PP_PHOTO_SCENES[bg];
+  const pst = spec ? ppPhotoState[bg] : null;
+  let img = null, kb = 0, ox = 0, oy = 0;
+  if (bg === "terrace" && PP_V3C_ASSETS.terrace && PP_V3C_ASSETS.terrace.status === "ready") {
+    img = PP_V3C_ASSETS.terrace.img;
+    const B = PP_V3C.bg;
+    const horizonY = h - (1920 - B.horizonY) * u;
+    // Same mapping as the still, enlarged only if a frame would otherwise
+    // show past the photo's edges.
+    kb = Math.max(B.k * u, (horizonY + pad) / B.horizon, (w / 2 + pad) / B.cx,
+                  (w / 2 + pad) / (img.width - B.cx), (h - horizonY + pad) / (img.height - B.horizon));
+    ox = w / 2 - B.cx * kb; oy = horizonY - B.horizon * kb;
+  } else if (pst && pst.status === "ready") {
+    img = pst.img;
+    kb = Math.max((w + pad * 2) / img.width, (h + pad * 2) / img.height);
+    ox = (w - img.width * kb) / 2; oy = (h - img.height * kb) / 2;
+  }
+  if (img) {
+    px.filter = `blur(${blur.toFixed(2)}px) saturate(0.88) brightness(1.06)`;
+    px.drawImage(img, ox + pad, oy + pad, img.width * kb, img.height * kb);
+    px.filter = "none";
+  } else {
+    // Studio: a plain, softly lit backdrop behind the table.
+    const gr = px.createLinearGradient(0, 0, 0, pc.height);
+    gr.addColorStop(0, "#efebe5");
+    gr.addColorStop(1, "#cfc7bb");
+    px.fillStyle = gr;
+    px.fillRect(0, 0, pc.width, pc.height);
+  }
+  x.drawImage(pc, -pad, -pad);
+  ppV3CPlate = { key, canvas: c };
+  return c;
+}
+
+function drawPhotoPrintV3C(p) {
+  const w = canvas.width, h = canvas.height;
+  const u = ppV3CScale(w, h);
+  const X = mx => w / 2 + (mx - 540) * u;   // master -> frame
+  const Y = my => h - (1920 - my) * u;
+  ppEnsureV3C();
+  if (PP_PHOTO_SCENES[photoPrint.background]) ppEnsurePhoto(photoPrint.background);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.filter = "none";
+  if (ppV3CStatus().status !== "ready") {
+    // Still loading (or unavailable - the note under Background says why).
+    ctx.fillStyle = "#d9d3ca";
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+    return;
+  }
+  ctx.drawImage(ppV3CBackground(w, h, u), 0, 0);
+
+  // Table: the photographed strip, mirrored copies to either side so wide
+  // frames get a continuous table top.
+  const T = PP_V3C.table, timg = PP_V3C_ASSETS.table.img;
+  const tw = T.w * u, th = T.h * u, tx = X(T.x), ty = Y(T.y);
+  for (let i = -Math.ceil(tx / tw); tx + i * tw < w; i++) {
+    const x0 = tx + i * tw;
+    if (x0 + tw <= 0) continue;
+    if (i % 2 !== 0) {
+      ctx.save();
+      ctx.translate(x0 + tw, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(timg, 0, ty, tw, th);
+      ctx.restore();
+    } else {
+      ctx.drawImage(timg, x0, ty, tw, th);
+    }
+  }
+
+  const timing = photoPrintTiming(ppClamp01(p), photoPrint.speed);
+  const P = PP_V3C.printer, pimg = PP_V3C_ASSETS.printer.img;
+  const lip = Y(PP_V3C.lipY);
+  // Subtle feed-motor vibration, as for the drawn printers.
+  const env = timing.printing ? ppSmoothstep(timing.raw / 0.06) * ppSmoothstep((1 - timing.raw) / 0.06) : 0;
+  const vib = env * P.w * u * 0.0035 * (Math.sin(timing.t * Math.PI * 2 * 9) + 0.5 * Math.sin(timing.t * Math.PI * 2 * 13 + 1.3));
+  ctx.translate(0, vib);
+  const drawPrinterPart = (front) => {
+    ctx.save();
+    ctx.beginPath();
+    if (front) ctx.rect(0, lip, w, h - lip + Math.abs(vib) + 2);
+    else ctx.rect(0, 0, w, lip);
+    ctx.clip();
+    ctx.drawImage(pimg, X(P.x), Y(P.y), P.w * u, P.h * u);
+    ctx.restore();
+  };
+  drawPrinterPart(false);                       // top surface and slot, behind the sheet
+  const g = {
+    cx: X(PP_V3C.slotCX), pw: PP_V3C.pw * u, ph: PP_V3C.ph * u,
+    slotY: lip, slitH: 0, paperKind: "photo", finalOut: PP_V3C.finalOut
+  };
+  ppDrawPaper(ctx, g, timing, ppPrintImage());  // the print, clipped at the slot lip
+  drawPrinterPart(true);                        // front lip and body over the sheet's bottom edge
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // One grade over the whole frame, as in the approved still: warm,
+  // a gentle vignette and fine grain - so plate, table, printer and
+  // print read as a single photograph.
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = "rgb(255,247,237)";
+  ctx.fillRect(0, 0, w, h);
+  const R = Math.max(w, h);
+  const vg = ctx.createRadialGradient(w / 2, h * 0.48, R * 0.3, w / 2, h * 0.5, R * 0.78);
+  vg.addColorStop(0, "rgb(255,255,255)");
+  vg.addColorStop(1, "rgb(206,204,202)");
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalCompositeOperation = "source-over";
+  ppGrain(ctx, 0, 0, w, h, 0.03);
+  ctx.restore();
+}
+
 let ppStudioBg = null;
 function drawPhotoPrintScene(p) {
+  if (photoPrint.printer === "photo") { drawPhotoPrintV3C(p); return; }
   const w = canvas.width, h = canvas.height;
-  const bgName = photoPrint.background;
+  const bgName = ppDrawnPrinterBackground();
   const photoSpec = PP_PHOTO_SCENES[bgName];
   const pst = photoSpec ? ppPhotoState[bgName] : null;
   if (photoSpec && !pst) ppEnsurePhoto(bgName);
@@ -4586,7 +4852,7 @@ function drawPhotoPrintScene(p) {
     drawPhotoPrintPhotoScene(p, bgName, photoSpec, pst);
     return;
   }
-  const sceneName = PP_SCENES[photoPrint.background] ? photoPrint.background : "studio";
+  const sceneName = PP_SCENES[bgName] ? bgName : "studio";
   // Studio gets the photo-first framing too; the illustrated scenes (only
   // a fallback while a background photo loads, or on file://) keep theirs.
   const image = ppPrintImage(); // the user's photo, or the sample until one is chosen
@@ -4844,6 +5110,7 @@ document.querySelectorAll('input[name="photoPrintPrinter"]').forEach(radio => {
   radio.addEventListener("change", () => {
     if (!radio.checked) return;
     photoPrint.printer = radio.value;
+    updatePhotoPrintBgNote();
     redrawPhotoPrintIfVisible();
   });
 });
@@ -4900,10 +5167,17 @@ async function exportPhotoPrint() {
 
     // A photographic background must be fully loaded before the first
     // frame - never export the illustrated loading fallback instead.
-    if (PP_PHOTO_SCENES[photoPrint.background]) {
+    if (photoPrint.printer === "photo") {
+      setStatus("Loading photographic scene...");
+      await ppEnsureV3C();
+      if (PP_PHOTO_SCENES[photoPrint.background]) await ppEnsurePhoto(photoPrint.background);
+      const v = ppV3CStatus();
+      if (v.status !== "ready") throw new Error(`photographic scene unavailable - ${v.error || "it did not load"}.`);
+    } else if (PP_PHOTO_SCENES[ppDrawnPrinterBackground()]) {
+      const bgName = ppDrawnPrinterBackground();
       setStatus("Loading background photo...");
-      await ppEnsurePhoto(photoPrint.background);
-      const st = ppPhotoState[photoPrint.background];
+      await ppEnsurePhoto(bgName);
+      const st = ppPhotoState[bgName];
       if (!st || st.status !== "ready") throw new Error(`background photo unavailable - ${st && st.error ? st.error : "it did not load"}.`);
     }
 
